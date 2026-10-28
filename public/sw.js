@@ -2,8 +2,8 @@
 // · La página se pide primero a la red (para tener siempre la última versión) y, si no hay, la guardada.
 // · Los archivos de /assets llevan un hash en el nombre: se guardan y se sirven desde la caché.
 // · Nada de Supabase, OpenRouter ni otras webs pasa por aquí.
-const CACHE = "grimorio-v1";
-const SHELL = ["./", "./manifest.webmanifest", "./favicon.svg", "./icon-192.png", "./icon-512.png"];
+const CACHE = "grimorio-v2";
+const SHELL = ["./", "./manifest.webmanifest", "./favicon.png", "./logo.webp", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));

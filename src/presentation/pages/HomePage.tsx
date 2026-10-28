@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
-import { ClockMark } from "../components/ClockMark";
+import { BrandMark } from "../components/BrandMark";
 import { Confirm } from "../components/Sheet";
 import { useAsync } from "../hooks/useAsync";
 import { Trash2, X } from "lucide-react";
@@ -41,7 +41,7 @@ export function HomePage() {
   return (
     <main className="page">
       <section className="hero">
-        <ClockMark />
+        <BrandMark />
         <h1>El Grimorio</h1>
         <p>Narra Blood on the Clocktower sin perder el hilo: prepara la bolsa, sigue la noche paso a paso y cuenta los votos.</p>
         <Link to="/nueva" className="btn btn--primary" style={{ minHeight: 56, padding: "0 32px", fontSize: "0.95rem" }}>

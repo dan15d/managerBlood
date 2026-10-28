@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../app/AppContext";
-import { ClockMark } from "../components/ClockMark";
+import { BrandMark } from "../components/BrandMark";
 
 /** Portada para quien no es Narrador: unirse a una partida o entrar como Narrador. */
 export function WelcomePage() {
@@ -15,7 +15,7 @@ export function WelcomePage() {
   return (
     <main className="page page--flow" style={{ maxWidth: 560 }}>
       <section className="hero">
-        <ClockMark />
+        <BrandMark />
         <h1>El Grimorio</h1>
         <p>Blood on the Clocktower en Ravenswood Bluff. Únete a la partida con el código que te dé el Narrador.</p>
         <div className="stack" style={{ maxWidth: 360, margin: "0 auto" }}>

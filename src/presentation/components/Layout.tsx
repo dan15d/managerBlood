@@ -18,7 +18,7 @@ export function Layout() {
     <>
       <header className="topbar">
         <NavLink to="/" className="brand" aria-label="Inicio">
-          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" />
+          <img src={`${import.meta.env.BASE_URL}logo.webp`} alt="" />
           <span>GRIMORIO</span>
         </NavLink>
       </header>

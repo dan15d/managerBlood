@@ -174,7 +174,9 @@ textarea {
 
 .brand img {
   width: 30px;
-  height: 30px;
+  height: 32px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgb(167 124 230 / 0.6));
 }
 
 /* En móvil la navegación va abajo, al alcance del pulgar. */
@@ -1459,11 +1461,12 @@ button.token {
   padding: 50px 10px 30px;
 }
 
-.hero__clock {
-  width: 120px;
-  height: 120px;
+.hero__logo {
+  display: block;
+  width: 150px;
+  height: auto;
   margin: 0 auto 18px;
-  filter: drop-shadow(0 0 30px rgb(124 72 196 / 0.6));
+  filter: drop-shadow(0 0 2px rgb(230 215 255 / 0.5)) drop-shadow(0 0 32px rgb(124 72 196 / 0.75));
 }
 
 .hero p {
