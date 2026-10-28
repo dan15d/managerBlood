@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useApp } from "../app/AppContext";
-import { CirclePlus, Clock, ScrollText, Settings } from "lucide-react";
+import { Clock, ScrollText, Settings } from "lucide-react";
 
 export function Layout() {
   const { pathname } = useLocation();
@@ -27,9 +27,6 @@ export function Layout() {
         <nav className="nav" aria-label="Principal">
           <NavItem to="/" icon={<Clock />} end>
             Partidas
-          </NavItem>
-          <NavItem to="/nueva" icon={<CirclePlus />}>
-            Nueva
           </NavItem>
           <NavItem to="/guiones" icon={<ScrollText />}>
             Guiones

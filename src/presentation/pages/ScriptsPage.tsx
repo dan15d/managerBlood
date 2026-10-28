@@ -1,6 +1,7 @@
 import type { Script } from "@domain/entities/Script";
 import { TEAM_LABEL, type Team } from "@domain/entities/Character";
 import { scriptToJson } from "@application/use-cases/ScriptUseCases";
+import { Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
@@ -51,17 +52,27 @@ export function ScriptsPage() {
     <main className="page">
       <div className="page-header">
         <h1>Guiones</h1>
-        <Link to="/guiones/nuevo" className="btn btn--primary">
-          Crear guion
-        </Link>
+        <div className="row">
+          <Link to="/guiones/nuevo?ia=1" className="btn btn--primary">
+            <Sparkles /> Con IA
+          </Link>
+          <Link to="/guiones/nuevo" className="btn">
+            Crear guion
+          </Link>
+        </div>
       </div>
       {scripts.error && <div className="alert alert--error">{scripts.error}</div>}
       <div className="grid">
         {scripts.data?.map((s) => (
           <article key={s.id} className="card edition-card">
-            <EditionBanner scriptId={s.id} name={s.name} />
+            <Link to={`/guiones/${s.id}/ver`} className="edition-card__link" aria-label={`Ver ${s.name}`}>
+              <EditionBanner scriptId={s.id} name={s.name} />
+            </Link>
             <div className="edition-card__body stack" style={{ gap: 8 }}>
-            {s.official && <span className="badge team-fabled" style={{ alignSelf: "flex-start" }}>Oficial</span>}
+            <div className="row">
+              <strong className="game-row__title" style={{ flex: 1 }}>{s.name}</strong>
+              {s.official && <span className="badge team-fabled">Oficial</span>}
+            </div>
             {s.author && <div className="muted small">{s.author}</div>}
             <div className="small">{counts(s)}</div>
             {s.description && (
@@ -70,6 +81,9 @@ export function ScriptsPage() {
               </p>
             )}
             <div className="row" style={{ marginTop: "auto" }}>
+              <Link to={`/guiones/${s.id}/ver`} className="btn btn--small btn--primary">
+                Ver
+              </Link>
               {s.official ? (
                 <button className="btn btn--small" onClick={() => navigate(`/guiones/nuevo?desde=${s.id}`)}>
                   Duplicar y editar

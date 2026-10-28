@@ -1,5 +1,7 @@
 import type {
   AiAdviceRequest,
+  AiScriptProposal,
+  AiScriptRequest,
   AiSetupProposal,
   AiSetupRequest,
   AiStoryteller,
@@ -90,6 +92,42 @@ Responde SOLO con un objeto JSON: {"characterIds": [], "bluffIds": [], "decoys":
       decoys: typeof data.decoys === "object" && data.decoys ? (data.decoys as Record<string, string>) : {},
       explanation: typeof data.explanation === "string" ? data.explanation : "",
       tips: asStringArray(data.tips),
+    };
+  }
+
+  async proposeScript(r: AiScriptRequest): Promise<AiScriptProposal> {
+    const edition: Record<string, string> = { tb: "TB", bmr: "BMR", snv: "S&V", exp: "Exp" };
+    const roster = r.characters
+      .map((c) => `- ${c.id} | ${c.name} | ${TEAM_LABEL[c.team].singular} | ${edition[c.edition] ?? c.edition} | ${c.ability}`)
+      .join("\n");
+    const t = r.target;
+    const prompt = `Diseña un guion personalizado de Blood on the Clocktower a partir de esta idea del Narrador:
+«${r.idea}»
+
+Debe tener exactamente ${t.townsfolk} Aldeanos, ${t.outsider} Forasteros, ${t.minion} Esbirros y ${t.demon} Demonios (${t.townsfolk + t.outsider + t.minion + t.demon} personajes).
+Criterios de un buen guion: suficiente información para el Bien, Esbirros y Demonios que puedan farolear con los Aldeanos del guion,
+interacciones interesantes (envenenamiento, borrachera, locura…) y que el tema de la idea se note. No repitas personajes.
+
+Personajes disponibles (id | nombre | tipo | edición | habilidad):
+${roster}
+${r.previousErrors?.length ? `
+Tu propuesta anterior no era válida: ${r.previousErrors.join(" ")} Corrígelo.
+` : ""}
+Responde SOLO con un objeto JSON: {"name": "nombre evocador en español", "description": "2-3 frases de ambientación", "characterIds": ["id", ...], "explanation": "2-4 frases sobre por qué funciona y qué interacciones destacan"}`;
+
+    const text = await this.chat.complete(
+      [
+        { role: "system", content: BASE_RULES },
+        { role: "user", content: prompt },
+      ],
+      { json: true, temperature: 0.9 },
+    );
+    const data = parseJson(text);
+    return {
+      name: typeof data.name === "string" ? data.name : "",
+      description: typeof data.description === "string" ? data.description : "",
+      characterIds: asStringArray(data.characterIds),
+      explanation: typeof data.explanation === "string" ? data.explanation : "",
     };
   }
 

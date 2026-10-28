@@ -798,6 +798,12 @@ button.token {
   overflow: hidden;
 }
 
+.pick__ability--full {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
 .pick__flag {
   font-size: 0.72rem;
   color: var(--fabled);
@@ -1688,6 +1694,38 @@ button.token {
 
 .night-item .token {
   cursor: inherit;
+}
+
+.edition-card__link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.night-sheet {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.night-sheet li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: rgb(36 26 47 / 0.75);
+  border: 1px solid var(--line);
 }
 
 .edition-card__body {

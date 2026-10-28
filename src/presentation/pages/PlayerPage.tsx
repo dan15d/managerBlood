@@ -1,15 +1,15 @@
-import type { Character, Team } from "@domain/entities/Character";
+import type { Character } from "@domain/entities/Character";
 import { TEAM_LABEL } from "@domain/entities/Character";
 import type { PlayerView } from "@domain/entities/Table";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
+import { ScriptCharacterList } from "../components/ScriptCharacterList";
 import { Confirm } from "../components/Sheet";
 import { Token } from "../components/Token";
 import { EyeOff, Flag, Moon, ScrollText, Sun, Users, VenetianMask } from "lucide-react";
 
 type Tab = "me" | "script" | "players";
-const SCRIPT_TEAMS: Team[] = ["townsfolk", "outsider", "minion", "demon", "traveller", "fabled"];
 
 /** El móvil de cada jugador: su personaje, el guion y la mesa, al día sin recargar. */
 export function PlayerPage() {
@@ -150,34 +150,7 @@ export function PlayerPage() {
           </section>
         ))}
 
-      {tab === "script" && (
-        <section>
-          {SCRIPT_TEAMS.map((team) => {
-            const list = script.filter((c) => c.team === team);
-            if (!list.length) return null;
-            return (
-              <div key={team} className="team-section">
-                <div className="team-section__head">
-                  <h3 className={`team-${team}`}>{TEAM_LABEL[team].plural}</h3>
-                </div>
-                <div className="stack" style={{ gap: 8 }}>
-                  {list.map((c) => (
-                    <div key={c.id} className="pick" style={{ cursor: "default" }}>
-                      <Token character={c} size={48} />
-                      <span className="pick__body">
-                        <span className="pick__name">{c.name}</span>
-                        <span className="pick__ability" style={{ WebkitLineClamp: "unset", display: "block" }}>
-                          {c.ability}
-                        </span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </section>
-      )}
+      {tab === "script" && <ScriptCharacterList characters={script} />}
 
       {tab === "players" && (
         <section>

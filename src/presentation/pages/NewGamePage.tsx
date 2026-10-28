@@ -69,6 +69,14 @@ export function NewGamePage() {
   const [seats, setSeats] = useState<Seat[]>([]);
   const [openingLobby, setOpeningLobby] = useState(false);
 
+  // Guion elegido desde su ficha (?guion=id): al escoger el modo se va directo a la sala.
+  const preselected = scripts.data?.find((s) => s.id === params.get("guion"));
+  const chooseMode = (m: GameMode) => {
+    setMode(m);
+    if (preselected && !lobby) void chooseScript(preselected);
+    else setStep(1);
+  };
+
   // Retomar una sala abierta desde la portada (?sala=id).
   const resumeId = params.get("sala");
   useEffect(() => {
@@ -258,10 +266,7 @@ export function NewGamePage() {
               title="Manual"
               text="Tú eliges los personajes de la bolsa (o pides un reparto al azar). Control total."
               selected={mode === "manual"}
-              onClick={() => {
-                setMode("manual");
-                setStep(1);
-              }}
+              onClick={() => chooseMode("manual")}
             />
             <ModeCard
               icon={<Sparkles />}
@@ -269,10 +274,7 @@ export function NewGamePage() {
               text="La IA prepara un reparto equilibrado según el estilo que pidas, te explica por qué y te aconseja durante la partida."
               selected={mode === "ai"}
               disabled={!app.aiAvailable}
-              onClick={() => {
-                setMode("ai");
-                setStep(1);
-              }}
+              onClick={() => chooseMode("ai")}
             />
           </div>
           {!app.aiAvailable && (

@@ -3,6 +3,7 @@ import { AskAiAdvice, CreateGame, DeleteGame, ListGames, LoadGame, SaveGame, Tes
 import { DeleteCustomScript, ListScripts, ParseScriptJson, SaveCustomScript } from "@application/use-cases/ScriptUseCases";
 import { CompleteManualSetup, GenerateAiSetup, SuggestRandomSetup } from "@application/use-cases/SetupUseCases";
 import { AdminSession, ManageLobby, PlayerTable } from "@application/use-cases/TableUseCases";
+import { GenerateAiScript } from "@application/use-cases/AiScriptUseCases";
 import { BrowserOpenRouterTransport, SupabaseFunctionTransport, type ChatTransport } from "@infrastructure/ai/ChatTransport";
 import { LlmStoryteller } from "@infrastructure/ai/LlmStoryteller";
 import { StaticCharacterCatalog, StaticOfficialScripts } from "@infrastructure/catalog/StaticCatalog";
@@ -53,6 +54,7 @@ export function buildContainer(settings: AppSettings) {
     suggestRandomSetup: new SuggestRandomSetup(catalog, random),
     completeManualSetup: new CompleteManualSetup(catalog, random),
     generateAiSetup: new GenerateAiSetup(catalog, ai, random),
+    generateAiScript: new GenerateAiScript(catalog, ai),
     createGame: new CreateGame(games, catalog, ids, random, publisher),
     listGames: new ListGames(games),
     loadGame: new LoadGame(games),

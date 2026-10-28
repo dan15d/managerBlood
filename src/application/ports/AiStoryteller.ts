@@ -33,6 +33,22 @@ export interface AiAdviceRequest {
   question: string;
 }
 
+export interface AiScriptRequest {
+  idea: string;
+  /** Cuántos personajes de cada tipo debe tener el guion. */
+  target: { townsfolk: number; outsider: number; minion: number; demon: number };
+  /** Personajes entre los que elegir. */
+  characters: Character[];
+  previousErrors?: string[];
+}
+
+export interface AiScriptProposal {
+  name: string;
+  description: string;
+  characterIds: string[];
+  explanation: string;
+}
+
 /** Narrador con IA. Las implementaciones deciden el proveedor (OpenRouter, función en la nube…). */
 export interface AiStoryteller {
   isAvailable(): boolean;
@@ -40,4 +56,5 @@ export interface AiStoryteller {
   checkConnection(): Promise<void>;
   proposeSetup(request: AiSetupRequest): Promise<AiSetupProposal>;
   advise(request: AiAdviceRequest): Promise<string>;
+  proposeScript(request: AiScriptRequest): Promise<AiScriptProposal>;
 }

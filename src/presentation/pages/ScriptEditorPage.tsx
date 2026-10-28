@@ -1,6 +1,8 @@
+import type { ScriptSize } from "@application/use-cases/AiScriptUseCases";
 import type { Edition } from "@domain/entities/Character";
+import { FileJson, Sparkles, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { CharacterPicker } from "../components/CharacterPicker";
 import { Sheet } from "../components/Sheet";
@@ -26,6 +28,31 @@ export function ScriptEditorPage() {
   const [importing, setImporting] = useState(false);
   const [importText, setImportText] = useState("");
   const [saving, setSaving] = useState(false);
+  // Crear con IA (se abre solo si se llega con ?ia=1 desde la lista de guiones).
+  const [aiOpen, setAiOpen] = useState(params.get("ia") === "1");
+  const [idea, setIdea] = useState("");
+  const [size, setSize] = useState<ScriptSize>("classic");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiNote, setAiNote] = useState<{ explanation: string; warnings: string[] } | null>(null);
+
+  const generate = async () => {
+    setAiBusy(true);
+    try {
+      const result = await app.generateAiScript.execute({ idea, size });
+      setName(result.name);
+      setDescription(result.description);
+      setAuthor((a) => a || "Creado con IA");
+      setSelected(result.characterIds);
+      setEdition("all");
+      setAiNote({ explanation: result.explanation, warnings: result.warnings });
+      setAiOpen(false);
+      toast("Guion propuesto. Revísalo y guárdalo.");
+    } catch (e) {
+      toast(errorMessage(e), "error");
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   // Cargar el guion que se edita o el oficial del que se parte.
   useEffect(() => {
@@ -85,10 +112,26 @@ export function ScriptEditorPage() {
     <main className="page page--flow">
       <div className="page-header">
         <h1>{id ? "Editar guion" : "Nuevo guion"}</h1>
-        <button className="btn btn--small" onClick={() => setImporting(true)}>
-          Importar JSON
-        </button>
+        <div className="row">
+          <button className="btn btn--small btn--primary" onClick={() => setAiOpen(true)}>
+            <Sparkles /> Con IA
+          </button>
+          <button className="btn btn--small" onClick={() => setImporting(true)}>
+            <FileJson /> JSON
+          </button>
+        </div>
       </div>
+
+      {aiNote && (
+        <div className="alert alert--info" style={{ marginBottom: 16 }}>
+          <strong>Propuesta de la IA.</strong> {aiNote.explanation}
+          {aiNote.warnings.map((w) => (
+            <div key={w} className="small" style={{ marginTop: 6 }}>
+              <TriangleAlert /> {w}
+            </div>
+          ))}
+        </div>
+      )}
 
       <section className="card stack">
         <label className="field">
@@ -133,6 +176,46 @@ export function ScriptEditorPage() {
           Guardar guion
         </button>
       </div>
+
+      {aiOpen && (
+        <Sheet onClose={() => setAiOpen(false)} title="Crear guion con IA" label="Crear guion con IA">
+          {!app.aiAvailable ? (
+            <div className="alert alert--info">
+              Necesitas conectar la IA. <Link to="/ajustes">Configúrala en Ajustes</Link>.
+            </div>
+          ) : (
+            <div className="stack">
+              <label className="field">
+                <span>Tu idea</span>
+                <textarea
+                  className="input"
+                  style={{ minHeight: 130 }}
+                  placeholder="Ej.: un pueblo de pescadores donde nadie se fía de nadie, con mucho envenenamiento y un Demonio que se esconde bien"
+                  value={idea}
+                  onChange={(e) => setIdea(e.target.value)}
+                />
+              </label>
+              <div className="field">
+                <span>Tamaño</span>
+                <div className="chips">
+                  <button className="chip" aria-pressed={size === "classic"} onClick={() => setSize("classic")}>
+                    Clásico · 13 / 4 / 4 / 4
+                  </button>
+                  <button className="chip" aria-pressed={size === "teensy"} onClick={() => setSize("teensy")}>
+                    Pequeño · 6 / 2 / 2 / 1
+                  </button>
+                </div>
+                <small className="muted">Aldeanos / Forasteros / Esbirros / Demonios. El pequeño es para 5 o 6 jugadores.</small>
+              </div>
+              <div className="action-bar action-bar--sheet">
+                <button className="btn btn--primary" onClick={generate} disabled={aiBusy || !idea.trim()}>
+                  <Sparkles /> {aiBusy ? "Diseñando el guion…" : "Proponer guion"}
+                </button>
+              </div>
+            </div>
+          )}
+        </Sheet>
+      )}
 
       {importing && (
         <Sheet onClose={() => setImporting(false)} title="Importar guion" label="Importar guion">

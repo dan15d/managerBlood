@@ -13,6 +13,7 @@ import { PlayerPage } from "./presentation/pages/PlayerPage";
 import { RevealPage } from "./presentation/pages/RevealPage";
 import { ScriptEditorPage } from "./presentation/pages/ScriptEditorPage";
 import { ScriptsPage } from "./presentation/pages/ScriptsPage";
+import { ScriptViewPage } from "./presentation/pages/ScriptViewPage";
 import { SettingsPage } from "./presentation/pages/SettingsPage";
 import { WelcomePage } from "./presentation/pages/WelcomePage";
 import "./presentation/styles/app.css";
@@ -43,6 +44,7 @@ const router = createHashRouter([
       { path: "/guiones", element: admin(<ScriptsPage />) },
       { path: "/guiones/nuevo", element: admin(<ScriptEditorPage />) },
       { path: "/guiones/:id", element: admin(<ScriptEditorPage />) },
+      { path: "/guiones/:id/ver", element: admin(<ScriptViewPage />) },
       { path: "/ajustes", element: admin(<SettingsPage />) },
       { path: "*", element: <Start /> },
     ],
