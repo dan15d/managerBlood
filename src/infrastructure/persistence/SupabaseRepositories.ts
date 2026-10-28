@@ -5,22 +5,32 @@ import type { Game } from "@domain/entities/Game";
 import type { Script } from "@domain/entities/Script";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-// Persistencia en Supabase (plan gratuito). Cada Narrador entra con una sesión anónima y las
-// políticas RLS (supabase/migrations) hacen que solo vea sus partidas y guiones.
+// Persistencia en Supabase (plan gratuito). Cada dispositivo entra con una sesión anónima y las
+// políticas RLS (supabase/migrations) dejan las partidas y guiones solo a los Narradores.
 // La partida se guarda entera como JSON (es un agregado); las columnas sueltas sirven para
-// listar sin descargar el Grimorio y para que los jugadores se unan por código en el futuro.
+// listar sin descargar el Grimorio.
 
-async function ownerId(client: SupabaseClient): Promise<string> {
+const signingIn = new WeakMap<SupabaseClient, Promise<string>>();
+
+/** Id de la sesión anónima de este navegador (la crea la primera vez, una sola aunque se pida a la vez). */
+export async function ownerId(client: SupabaseClient): Promise<string> {
   const { data } = await client.auth.getSession();
   if (data.session) return data.session.user.id;
-  const { data: signed, error } = await client.auth.signInAnonymously();
-  if (error || !signed.user) {
-    throw new Error("No he podido conectar con Supabase. Revisa que el inicio de sesión anónimo esté activado.");
+  let pending = signingIn.get(client);
+  if (!pending) {
+    pending = (async () => {
+      const { data: signed, error } = await client.auth.signInAnonymously();
+      if (error || !signed.user) {
+        throw new Error("No he podido conectar con Supabase. Revisa que el inicio de sesión anónimo esté activado.");
+      }
+      return signed.user.id;
+    })().finally(() => signingIn.delete(client));
+    signingIn.set(client, pending);
   }
-  return signed.user.id;
+  return pending;
 }
 
-const fail = (what: string, error: { message: string } | null) => {
+export const fail = (what: string, error: { message: string } | null) => {
   if (error) throw new Error(`Supabase: no he podido ${what} (${error.message}).`);
 };
 

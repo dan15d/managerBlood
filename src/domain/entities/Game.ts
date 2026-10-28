@@ -50,6 +50,8 @@ export interface Game {
   mode: GameMode;
   scriptId: string;
   scriptName: string;
+  /** Personajes del guion, para que los jugadores vean la lista aunque el guion sea personalizado. */
+  scriptCharacterIds?: string[];
   players: Player[];
   demonBluffs: string[];
   phase: Phase;

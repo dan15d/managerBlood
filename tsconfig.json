@@ -21,5 +21,7 @@
       "@presentation/*": ["./src/presentation/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  // La prueba contra Supabase usa APIs de Node; la comprueba Vitest al ejecutarla.
+  "exclude": ["src/**/*.integration.test.ts"]
 }

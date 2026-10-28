@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { supabaseConfigured } from "../app/container";
 
@@ -6,7 +7,8 @@ import { supabaseConfigured } from "../app/container";
 const MODELS = [{ id: "deepseek/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash (barato y rápido)" }];
 
 export function SettingsPage() {
-  const { app, settings, updateSettings, toast } = useApp();
+  const { app, settings, updateSettings, toast, refreshRole } = useApp();
+  const navigate = useNavigate();
   const [form, setForm] = useState(settings);
   const [testing, setTesting] = useState(false);
   const dirty = JSON.stringify(form) !== JSON.stringify(settings);
@@ -127,6 +129,29 @@ export function SettingsPage() {
         </div>
         {!app.aiAvailable && !dirty && <p className="muted small">El modo IA está desactivado hasta que configures la conexión.</p>}
       </section>
+
+      {app.admin.required && (
+        <section className="card stack" style={{ marginTop: 16 }}>
+          <h2>Modo Narrador</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            Este dispositivo es de Narrador. Si lo vas a usar como jugador (o es un móvil prestado), sal del modo Narrador.
+          </p>
+          <button
+            className="btn"
+            onClick={async () => {
+              try {
+                await app.admin.logout();
+                await refreshRole();
+                navigate("/", { replace: true });
+              } catch (e) {
+                toast(errorMessage(e), "error");
+              }
+            }}
+          >
+            Salir del modo Narrador
+          </button>
+        </section>
+      )}
     </main>
   );
 }

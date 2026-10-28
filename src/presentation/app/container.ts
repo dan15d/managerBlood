@@ -2,12 +2,24 @@ import type { AppSettings } from "@application/ports/SettingsStore";
 import { AskAiAdvice, CreateGame, DeleteGame, ListGames, LoadGame, SaveGame, TestAiConnection } from "@application/use-cases/GameUseCases";
 import { DeleteCustomScript, ListScripts, ParseScriptJson, SaveCustomScript } from "@application/use-cases/ScriptUseCases";
 import { CompleteManualSetup, GenerateAiSetup, SuggestRandomSetup } from "@application/use-cases/SetupUseCases";
+import { AdminSession, ManageLobby, PlayerTable } from "@application/use-cases/TableUseCases";
 import { BrowserOpenRouterTransport, SupabaseFunctionTransport, type ChatTransport } from "@infrastructure/ai/ChatTransport";
 import { LlmStoryteller } from "@infrastructure/ai/LlmStoryteller";
 import { StaticCharacterCatalog, StaticOfficialScripts } from "@infrastructure/catalog/StaticCatalog";
 import { CryptoIdGenerator, env, hasSupabase, LocalSettingsStore } from "@infrastructure/config/BrowserServices";
-import { LocalStorageGameRepository, LocalStorageScriptRepository } from "@infrastructure/persistence/LocalStorageRepositories";
+import {
+  LocalAdminAuth,
+  LocalStorageGameRepository,
+  LocalStorageScriptRepository,
+  NoTablePublisher,
+} from "@infrastructure/persistence/LocalStorageRepositories";
 import { SupabaseGameRepository, SupabaseScriptRepository } from "@infrastructure/persistence/SupabaseRepositories";
+import {
+  SupabaseAdminAuth,
+  SupabaseLobbyGateway,
+  SupabasePlayerGateway,
+  SupabaseTablePublisher,
+} from "@infrastructure/persistence/SupabaseTable";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // Raíz de composición: el único sitio que conoce las implementaciones concretas.
@@ -28,6 +40,7 @@ export function buildContainer(settings: AppSettings) {
   const games = supabase ? new SupabaseGameRepository(supabase) : new LocalStorageGameRepository();
   const scripts = supabase ? new SupabaseScriptRepository(supabase) : new LocalStorageScriptRepository();
   const ai = new LlmStoryteller(transportFor(settings));
+  const publisher = supabase ? new SupabaseTablePublisher(supabase) : new NoTablePublisher();
 
   return {
     catalog,
@@ -40,14 +53,18 @@ export function buildContainer(settings: AppSettings) {
     suggestRandomSetup: new SuggestRandomSetup(catalog, random),
     completeManualSetup: new CompleteManualSetup(catalog, random),
     generateAiSetup: new GenerateAiSetup(catalog, ai, random),
-    createGame: new CreateGame(games, catalog, ids, random),
+    createGame: new CreateGame(games, catalog, ids, random, publisher),
     listGames: new ListGames(games),
     loadGame: new LoadGame(games),
-    saveGame: new SaveGame(games),
-    deleteGame: new DeleteGame(games),
+    saveGame: new SaveGame(games, publisher, catalog),
+    deleteGame: new DeleteGame(games, publisher),
     askAi: new AskAiAdvice(ai, catalog),
     testAi: new TestAiConnection(ai),
     newId: () => ids.uuid(),
+    admin: new AdminSession(supabase ? new SupabaseAdminAuth(supabase) : new LocalAdminAuth()),
+    // Sala y jugadores solo existen con la nube: sin ella, la app es solo del Narrador.
+    lobby: supabase ? new ManageLobby(new SupabaseLobbyGateway(supabase), ids) : null,
+    player: supabase ? new PlayerTable(new SupabasePlayerGateway(supabase)) : null,
   };
 }
 

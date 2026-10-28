@@ -2,6 +2,7 @@ import type { SetupStyle } from "@application/ports/AiStoryteller";
 import type { Character } from "@domain/entities/Character";
 import type { GameMode } from "@domain/entities/Game";
 import type { Script } from "@domain/entities/Script";
+import type { Lobby, Seat } from "@domain/entities/Table";
 import {
   baseDistribution,
   MAX_PLAYERS,
@@ -11,9 +12,10 @@ import {
   validateSelection,
 } from "@domain/services/SetupRules";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { CharacterPicker, DistributionBar } from "../components/CharacterPicker";
+import { LobbyPanel } from "../components/LobbyPanel";
 import { Token } from "../components/Token";
 import { useAsync } from "../hooks/useAsync";
 
@@ -59,6 +61,42 @@ export function NewGamePage() {
   const [assignment, setAssignment] = useState<Record<number, string>>({});
   const [gameName, setGameName] = useState("");
   const [creating, setCreating] = useState(false);
+  // Con la nube, los jugadores se unen a una sala y sus nombres forman los asientos.
+  const [params] = useSearchParams();
+  const [lobby, setLobby] = useState<Lobby | null>(null);
+  const [seats, setSeats] = useState<Seat[]>([]);
+  const [openingLobby, setOpeningLobby] = useState(false);
+
+  // Retomar una sala abierta desde la portada (?sala=id).
+  const resumeId = params.get("sala");
+  useEffect(() => {
+    if (!resumeId || !app.lobby || !scripts.data) return;
+    void app.lobby.get(resumeId).then((l) => {
+      if (!l) return;
+      setLobby(l);
+      setScript(scripts.data!.find((s) => s.id === l.scriptId) ?? null);
+      setMode((m) => m ?? "manual");
+      setStep(2);
+    });
+  }, [app, resumeId, scripts.data]);
+
+  useEffect(() => {
+    if (!lobby || !app.lobby) return;
+    return app.lobby.watch(lobby.gameId, setSeats);
+  }, [app, lobby]);
+
+  // En la sala, el número de jugadores y sus nombres salen de quién se ha unido.
+  useEffect(() => {
+    if (!lobby) return;
+    setNames(seats.map((s) => s.name));
+    if (playerCount !== seats.length) {
+      // Si entra o sale alguien, la bolsa elegida ya no cuadra.
+      setPlayerCount(seats.length);
+      setSelected([]);
+      setAssignment({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lobby, seats]);
 
   const pool = useMemo(
     () => (script ? script.characterIds.map((id) => app.catalog.get(id)).filter((c): c is Character => !!c) : []),
@@ -129,10 +167,31 @@ export function NewGamePage() {
     }
   };
 
+  const chooseScript = async (s: Script) => {
+    if (script?.id !== s.id) resetSelection();
+    if (app.lobby) {
+      setOpeningLobby(true);
+      try {
+        if (!lobby) setLobby(await app.lobby.open(s));
+        else if (lobby.scriptId !== s.id) {
+          await app.lobby.changeScript(lobby.gameId, s);
+          setLobby({ ...lobby, scriptId: s.id, scriptName: s.name, characterIds: s.characterIds });
+        }
+      } catch (e) {
+        toast(errorMessage(e), "error");
+        return;
+      } finally {
+        setOpeningLobby(false);
+      }
+    }
+    setScript(s);
+    setStep(2);
+  };
+
   const canAdvance = [
     !!mode,
     !!script,
-    playerCount >= MIN_PLAYERS,
+    lobby ? seats.length >= MIN_PLAYERS : playerCount >= MIN_PLAYERS,
     selected.length > 0 && errors.length === 0 && travellers.length === travellerCount(playerCount),
     !manualSeats || Object.keys(assignment).length === bagCount,
   ][step];
@@ -160,6 +219,7 @@ export function NewGamePage() {
         assignment: manualSeats ? assignment : undefined,
         travellers: Object.fromEntries(travellers.map((id, i) => [bagCount + i, id])),
         aiNotes: notes,
+        table: lobby ? { gameId: lobby.gameId, joinCode: lobby.joinCode, seats } : undefined,
       });
       navigate(`/partida/${game.id}`, { replace: true });
     } catch (e) {
@@ -229,11 +289,8 @@ export function NewGamePage() {
               <button
                 key={s.id}
                 className={`card card--interactive ${script?.id === s.id ? "card--selected" : ""}`}
-                onClick={() => {
-                  if (script?.id !== s.id) resetSelection();
-                  setScript(s);
-                  setStep(2);
-                }}
+                disabled={openingLobby}
+                onClick={() => void chooseScript(s)}
               >
                 <div className="row">
                   <h3 style={{ margin: 0 }}>{s.name}</h3>
@@ -256,7 +313,20 @@ export function NewGamePage() {
         </section>
       )}
 
-      {step === 2 && (
+      {step === 2 && lobby && (
+        <section className="stack">
+          <h1>Sala de espera</h1>
+          <p className="muted" style={{ marginTop: -8 }}>
+            Que cada jugador escanee el QR o entre con el código. Necesitas al menos {MIN_PLAYERS}.
+          </p>
+          <LobbyPanel lobby={lobby} seats={seats} />
+          {seats.length >= MIN_PLAYERS && (
+            <DistributionBar distribution={baseDistribution(seats.length)} travellers={travellerCount(seats.length)} />
+          )}
+        </section>
+      )}
+
+      {step === 2 && !lobby && (
         <section className="stack">
           <h1>¿Cuántos jugadores?</h1>
           <div className="card stack" style={{ alignItems: "center" }}>

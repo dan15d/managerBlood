@@ -1,9 +1,14 @@
 import type { AppSettings } from "@application/ports/SettingsStore";
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { buildContainer, settingsStore, type Container } from "./container";
+
+/** Narrador (puede crear y llevar partidas) o invitado (solo puede unirse como jugador). */
+export type Role = "loading" | "admin" | "guest";
 
 interface AppContextValue {
   app: Container;
+  role: Role;
+  refreshRole(): Promise<void>;
   settings: AppSettings;
   updateSettings(settings: AppSettings): void;
   toast(message: string, kind?: "info" | "error"): void;
@@ -21,6 +26,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState(() => settingsStore.load());
   const app = useMemo(() => buildContainer(settings), [settings]);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [role, setRole] = useState<Role>("loading");
+
+  const refreshRole = useCallback(async () => {
+    try {
+      setRole((await app.admin.check()) ? "admin" : "guest");
+    } catch {
+      setRole("guest");
+    }
+  }, [app]);
+
+  useEffect(() => {
+    void refreshRole();
+  }, [refreshRole]);
 
   const updateSettings = useCallback((next: AppSettings) => {
     settingsStore.save(next);
@@ -33,7 +51,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === "error" ? 6000 : 3000);
   }, []);
 
-  const value = useMemo(() => ({ app, settings, updateSettings, toast }), [app, settings, updateSettings, toast]);
+  const value = useMemo(
+    () => ({ app, role, refreshRole, settings, updateSettings, toast }),
+    [app, role, refreshRole, settings, updateSettings, toast],
+  );
 
   return (
     <Ctx.Provider value={value}>

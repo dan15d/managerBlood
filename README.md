@@ -1,6 +1,11 @@
 # Grimorio · Blood on the Clocktower
 
-Webapp para el **Narrador** de Blood on the Clocktower, pensada primero para el móvil. Prepara la partida en modo **manual** o con **IA** (OpenRouter + DeepSeek), y luego guía la noche paso a paso, cuenta los votos y avisa del final.
+Webapp de Blood on the Clocktower pensada primero para el móvil, con dos modos:
+
+- **Narrador** (con contraseña): prepara la partida en modo **manual** o con **IA** (OpenRouter + DeepSeek), abre una sala con código y QR, reparte y lleva el Grimorio: noche paso a paso, votos y final.
+- **Jugador** (sin cuenta): se une con el código, ve su personaje (el Borracho ve el falso), la lista de personajes del guion, la fase y quién sigue vivo. Todo llega en tiempo real.
+
+Se puede instalar en el móvil desde el navegador («Añadir a pantalla de inicio»).
 
 - Guiones oficiales (Trouble Brewing, Bad Moon Rising, Sects & Violets) y **guiones personalizados** (con importación/exportación del JSON de la herramienta oficial).
 - 181 personajes en español (nombres, habilidades, recordatorios y textos de noche de la [wiki de Villacuervos](https://villacuervos.es/wiki/)) con el **orden de noche oficial**.
@@ -45,16 +50,31 @@ src/
 - La IA **propone** y el dominio **valida**: si el reparto de la IA no cumple la hoja de preparación, se le devuelven los errores y lo corrige; si no, se avisa.
 - Cambiar de proveedor de IA o de base de datos es añadir un adaptador nuevo, sin tocar dominio ni pantallas.
 
+## Modo Narrador y modo jugador
+
+- Al abrir la web: «Unirme a una partida» o «Soy el Narrador». El Narrador escribe la contraseña común; la comprueba la base de datos (`claim_admin`), nunca la web, y solo se guarda cifrada.
+- Todos los Narradores ven todas las partidas: con la contraseña entras desde el móvil o el PC y tienes lo mismo.
+- Los jugadores solo pueden leer su asiento (`game_seats`) y la información pública de su partida (`game_public`); el Grimorio (`games`) es solo de Narradores. Lo hacen cumplir las políticas RLS de `supabase/migrations/`.
+- Tiempo real con Supabase Realtime: el Narrador ve entrar a los jugadores; los jugadores reciben su personaje y los cambios (fase, muertes) al momento.
+
+Para poner o cambiar la contraseña de Narrador, en Supabase → SQL Editor:
+
+```sql
+select private.set_admin_password('la-contraseña');
+```
+
 ## Base de datos en la nube (Supabase, gratis)
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
 2. **Authentication → Sign In / Providers → Anonymous**: actívalo (cada Narrador entra sin registrarse).
-3. **SQL Editor**: ejecuta `supabase/migrations/20261028000000_init.sql`.
+3. **SQL Editor**: ejecuta, en orden, los archivos de `supabase/migrations/`, y después pon la contraseña de Narrador (ver arriba).
 4. Copia `.env.example` a `.env.local` y rellena `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (Project Settings → API).
 
 La clave *anon* es pública por diseño; los datos los protegen las políticas RLS (cada uno ve solo lo suyo).
 
-La sesión anónima es de cada navegador: las partidas no se ven desde otro dispositivo ni sobreviven a borrar los datos del navegador. Para eso hay que añadir inicio de sesión con cuenta (Supabase permite convertir la sesión anónima en una cuenta sin perder lo guardado).
+Cada navegador tiene su sesión anónima. Para el Narrador no importa (lo que cuenta es la contraseña); un jugador que borre los datos del navegador tendrá que volver a unirse (o el Narrador lo añade a mano).
+
+Prueba de punta a punta contra Supabase (no corre con `npm test`): ver `src/tests/table.integration.test.ts`.
 
 ## Modo IA (OpenRouter + DeepSeek)
 
@@ -77,16 +97,6 @@ Para pruebas sin Supabase: en **Ajustes** de la app se puede pegar una clave de 
 2. **Settings → Pages → Source: GitHub Actions**.
 3. **Settings → Secrets and variables → Actions → Variables**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y, si quieres, `VITE_AI_MODEL`.
 4. Cada push a `main` pasa los tests, compila y publica (`.github/workflows/deploy.yml`) en `https://<usuario>.github.io/<repositorio>/`.
-
-## Próximo paso: app para jugadores
-
-Ya está preparado:
-
-- Cada partida tiene un `joinCode` (5 caracteres sin letras confusas).
-- `Player.userId` y la tabla `game_seats` (con RLS: cada jugador solo lee su asiento y el personaje que *cree* ser; el Grimorio queda solo para el Narrador).
-- La pantalla «Repartir» muestra exactamente lo que vería cada jugador en su móvil.
-
-Faltaría: pantalla «Unirse con código», que el Narrador publique los asientos en `game_seats` al crear la partida, y Supabase Realtime para avisar a los jugadores (muertes, fase del día).
 
 ## Datos
 

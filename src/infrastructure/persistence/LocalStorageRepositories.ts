@@ -1,5 +1,6 @@
 import type { GameRepository } from "@application/ports/GameRepository";
 import type { CustomScriptRepository } from "@application/ports/ScriptRepository";
+import type { AdminAuth, TablePublisher } from "@application/ports/TableGateway";
 import { summarize } from "@application/use-cases/GameUseCases";
 import type { Game } from "@domain/entities/Game";
 import type { Script } from "@domain/entities/Script";
@@ -67,4 +68,21 @@ export class LocalStorageScriptRepository implements CustomScriptRepository {
     const { [id]: _removed, ...rest } = this.store.read();
     this.store.write(rest);
   }
+}
+
+// Sin nube no hay jugadores conectados: quien abre la app es el Narrador y no se publica nada.
+export class LocalAdminAuth implements AdminAuth {
+  readonly required = false;
+  async isAdmin() {
+    return true;
+  }
+  async login() {
+    return true;
+  }
+  async logout() {}
+}
+
+export class NoTablePublisher implements TablePublisher {
+  async publish() {}
+  async remove() {}
 }

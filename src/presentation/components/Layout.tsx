@@ -1,11 +1,14 @@
 import { useEffect, type ReactNode } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useApp } from "../app/AppContext";
 
 export function Layout() {
   const { pathname } = useLocation();
+  const { role } = useApp();
   // El asistente, la partida y el editor de guiones son pantallas de flujo: sin barra inferior,
-  // con sus propios botones abajo.
+  // con sus propios botones abajo. Los jugadores nunca ven la barra del Narrador.
   const flow = ["/nueva", "/partida", "/guiones/"].some((prefix) => pathname.startsWith(prefix));
+  const showNav = role === "admin" && !flow && !["/unirse", "/jugar", "/narrador"].some((p) => pathname.startsWith(p));
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
@@ -19,7 +22,7 @@ export function Layout() {
         </NavLink>
       </header>
       {/* Fuera de la cabecera: su desenfoque haría que la barra fija se quedase arriba en el móvil. */}
-      {!flow && (
+      {showNav && (
         <nav className="nav" aria-label="Principal">
           <NavItem to="/" icon="🕯️" end>
             Partidas
