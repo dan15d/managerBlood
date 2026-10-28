@@ -6,6 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { Confirm } from "../components/Sheet";
 import { useAsync } from "../hooks/useAsync";
+import { EditionBanner } from "../components/EditionBanner";
 
 export function ScriptsPage() {
   const { app, toast } = useApp();
@@ -57,11 +58,10 @@ export function ScriptsPage() {
       {scripts.error && <div className="alert alert--error">{scripts.error}</div>}
       <div className="grid">
         {scripts.data?.map((s) => (
-          <article key={s.id} className="card stack" style={{ gap: 8 }}>
-            <div className="row">
-              <h3 style={{ margin: 0 }}>{s.name}</h3>
-              {s.official && <span className="badge team-fabled">Oficial</span>}
-            </div>
+          <article key={s.id} className="card edition-card">
+            <EditionBanner scriptId={s.id} name={s.name} />
+            <div className="edition-card__body stack" style={{ gap: 8 }}>
+            {s.official && <span className="badge team-fabled" style={{ alignSelf: "flex-start" }}>Oficial</span>}
             {s.author && <div className="muted small">{s.author}</div>}
             <div className="small">{counts(s)}</div>
             {s.description && (
@@ -87,6 +87,7 @@ export function ScriptsPage() {
               <button className="btn btn--small btn--ghost" onClick={() => exportScript(s)}>
                 Copiar JSON
               </button>
+            </div>
             </div>
           </article>
         ))}

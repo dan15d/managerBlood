@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useApp } from "../app/AppContext";
+import { CirclePlus, Clock, ScrollText, Settings } from "lucide-react";
 
 export function Layout() {
   const { pathname } = useLocation();
@@ -24,16 +25,16 @@ export function Layout() {
       {/* Fuera de la cabecera: su desenfoque haría que la barra fija se quedase arriba en el móvil. */}
       {showNav && (
         <nav className="nav" aria-label="Principal">
-          <NavItem to="/" icon="🕯️" end>
+          <NavItem to="/" icon={<Clock />} end>
             Partidas
           </NavItem>
-          <NavItem to="/nueva" icon="🩸">
+          <NavItem to="/nueva" icon={<CirclePlus />}>
             Nueva
           </NavItem>
-          <NavItem to="/guiones" icon="📜">
+          <NavItem to="/guiones" icon={<ScrollText />}>
             Guiones
           </NavItem>
-          <NavItem to="/ajustes" icon="⚙️">
+          <NavItem to="/ajustes" icon={<Settings />}>
             Ajustes
           </NavItem>
         </nav>
@@ -43,7 +44,7 @@ export function Layout() {
   );
 }
 
-function NavItem({ to, icon, end, children }: { to: string; icon: string; end?: boolean; children: ReactNode }) {
+function NavItem({ to, icon, end, children }: { to: string; icon: ReactNode; end?: boolean; children: ReactNode }) {
   return (
     <NavLink to={to} end={end} className={({ isActive }) => (isActive ? "active" : undefined)}>
       <span className="nav__icon" aria-hidden>

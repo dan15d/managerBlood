@@ -4,6 +4,7 @@ import { errorMessage, useApp } from "../app/AppContext";
 import { ClockMark } from "../components/ClockMark";
 import { Confirm } from "../components/Sheet";
 import { useAsync } from "../hooks/useAsync";
+import { Trash2, X } from "lucide-react";
 
 const timeAgo = (iso: string) => {
   const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -75,7 +76,7 @@ export function HomePage() {
                     }
                   }}
                 >
-                  ✕
+                  <X />
                 </button>
               </div>
             ))}
@@ -149,7 +150,7 @@ function GameRow(props: {
           props.onDelete();
         }}
       >
-        🗑
+        <Trash2 />
       </button>
     </div>
   );

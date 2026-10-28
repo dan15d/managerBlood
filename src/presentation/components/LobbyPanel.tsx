@@ -2,6 +2,7 @@ import type { Lobby, Seat } from "@domain/entities/Table";
 import { useState } from "react";
 import { errorMessage, useApp } from "../app/AppContext";
 import { joinUrl, QrCode } from "./QrCode";
+import { ChevronDown, ChevronUp, PenLine, Share2, Smartphone, X } from "lucide-react";
 
 interface Props {
   lobby: Lobby;
@@ -46,7 +47,7 @@ export function LobbyPanel({ lobby, seats }: Props) {
         {showQr && <QrCode text={joinUrl(lobby.joinCode)} size={210} />}
         <div className="row" style={{ justifyContent: "center" }}>
           <button className="btn btn--small" onClick={share}>
-            📤 Compartir enlace
+            <Share2 /> Compartir enlace
           </button>
           <button className="btn btn--small btn--ghost" onClick={() => setShowQr(!showQr)}>
             {showQr ? "Ocultar QR" : "Ver QR"}
@@ -69,7 +70,7 @@ export function LobbyPanel({ lobby, seats }: Props) {
               <span className="seat-input__num">{i + 1}</span>
               <span className="seat-row__name">
                 {s.name}
-                <span className="muted small">{s.userId ? " 📱" : " ✍️"}</span>
+                <span className="muted small seat-row__kind" title={s.userId ? "Con móvil" : "Añadido a mano"}>{s.userId ? <Smartphone /> : <PenLine />}</span>
               </span>
               <button
                 className="btn btn--ghost icon-btn"
@@ -77,7 +78,7 @@ export function LobbyPanel({ lobby, seats }: Props) {
                 disabled={i === 0}
                 onClick={() => run(() => manage.move(lobby.gameId, seats, s.id, -1))}
               >
-                ▲
+                <ChevronUp />
               </button>
               <button
                 className="btn btn--ghost icon-btn"
@@ -85,14 +86,14 @@ export function LobbyPanel({ lobby, seats }: Props) {
                 disabled={i === seats.length - 1}
                 onClick={() => run(() => manage.move(lobby.gameId, seats, s.id, 1))}
               >
-                ▼
+                <ChevronDown />
               </button>
               <button
                 className="btn btn--ghost icon-btn"
                 aria-label={`Quitar a ${s.name}`}
                 onClick={() => run(() => manage.removeSeat(s.id))}
               >
-                ✕
+                <X />
               </button>
             </li>
           ))}

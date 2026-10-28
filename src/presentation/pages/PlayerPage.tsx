@@ -6,6 +6,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { Confirm } from "../components/Sheet";
 import { Token } from "../components/Token";
+import { EyeOff, Flag, Moon, ScrollText, Sun, Users, VenetianMask } from "lucide-react";
 
 type Tab = "me" | "script" | "players";
 const SCRIPT_TEAMS: Team[] = ["townsfolk", "outsider", "minion", "demon", "traveller", "fabled"];
@@ -70,26 +71,26 @@ export function PlayerPage() {
           <span className="phase-pill">Sala de espera</span>
         ) : (
           <span className={`phase-pill phase-pill--${view.phaseLabel?.startsWith("Noche") ? "night" : "day"}`}>
-            {view.phaseLabel?.startsWith("Noche") ? "☾" : view.status === "finished" ? "⚑" : "☀"} {view.phaseLabel}
+            {view.phaseLabel?.startsWith("Noche") ? <Moon /> : view.status === "finished" ? <Flag /> : <Sun />} {view.phaseLabel}
           </span>
         )}
       </div>
 
       {view.status === "finished" && (
         <div className={`banner banner--${view.winner}`}>
-          <h2>{view.winner === "good" ? "😇 Ha ganado el Bien" : "😈 Ha ganado el Mal"}</h2>
+          <h2>{view.winner === "good" ? "Ha ganado el Bien" : "Ha ganado el Mal"}</h2>
         </div>
       )}
 
       <div className="tabs tabs--page" role="tablist">
         <button className="tab" role="tab" aria-selected={tab === "me"} onClick={() => setTab("me")}>
-          🎭 Mi personaje
+          <VenetianMask /> Mi personaje
         </button>
         <button className="tab" role="tab" aria-selected={tab === "script"} onClick={() => setTab("script")}>
-          📜 Guion
+          <ScrollText /> Guion
         </button>
         <button className="tab" role="tab" aria-selected={tab === "players"} onClick={() => setTab("players")}>
-          👥 Mesa
+          <Users /> Mesa
         </button>
       </div>
 
@@ -133,7 +134,7 @@ export function PlayerPage() {
                   {character.ability}
                 </p>
                 <button className="btn btn--ghost" onClick={() => setRevealed(false)}>
-                  🙈 Ocultar
+                  <EyeOff /> Ocultar
                 </button>
               </>
             ) : (
@@ -197,7 +198,7 @@ export function PlayerPage() {
                       {p.name}
                       {p.seat === view.seat && <span className="muted small"> (tú)</span>}
                     </span>
-                    <span className="small">{p.alive ? "Vivo" : p.ghostVoteUsed ? "☠ sin voto" : "☠ con voto"}</span>
+                    <span className="small">{p.alive ? "Vivo" : p.ghostVoteUsed ? "Muerto, sin voto" : "Muerto, con voto"}</span>
                   </li>
                 ))}
               </ul>

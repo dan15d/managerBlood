@@ -135,8 +135,7 @@ export function ScriptEditorPage() {
       </div>
 
       {importing && (
-        <Sheet onClose={() => setImporting(false)} label="Importar guion">
-          <h2>Importar guion</h2>
+        <Sheet onClose={() => setImporting(false)} title="Importar guion" label="Importar guion">
           <p className="muted small">
             Pega el JSON de la herramienta oficial (script.bloodontheclocktower.com) o una lista de ids de personajes.
           </p>

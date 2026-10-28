@@ -11,22 +11,24 @@ import {
   travellerCount,
   validateSelection,
 } from "@domain/services/SetupRules";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { CharacterPicker, DistributionBar } from "../components/CharacterPicker";
 import { LobbyPanel } from "../components/LobbyPanel";
 import { Token } from "../components/Token";
 import { useAsync } from "../hooks/useAsync";
+import { EditionBanner } from "../components/EditionBanner";
+import { BookOpen, Check, Dices, PenLine, Pencil, Scale, Search, Shuffle, Skull, Sparkles, Sprout, Tornado, VenetianMask } from "lucide-react";
 
 const STEPS = ["Modo", "Guion", "Jugadores", "Personajes", "Reparto"] as const;
 
-const STYLES: { id: SetupStyle; label: string }[] = [
-  { id: "equilibrada", label: "⚖️ Equilibrada" },
-  { id: "principiantes", label: "🌱 Para principiantes" },
-  { id: "mucha_info", label: "🔎 Mucha información" },
-  { id: "caotica", label: "🌀 Caótica" },
-  { id: "maligna", label: "😈 Ventaja al Mal" },
+const STYLES: { id: SetupStyle; label: string; icon: ReactNode }[] = [
+  { id: "equilibrada", label: "Equilibrada", icon: <Scale /> },
+  { id: "principiantes", label: "Para principiantes", icon: <Sprout /> },
+  { id: "mucha_info", label: "Mucha información", icon: <Search /> },
+  { id: "caotica", label: "Caótica", icon: <Tornado /> },
+  { id: "maligna", label: "Ventaja al Mal", icon: <Skull /> },
 ];
 
 const NAMES_KEY = "grimorio.lastNames";
@@ -241,7 +243,7 @@ export function NewGamePage() {
             onClick={() => setStep(i)}
             aria-current={i === step ? "step" : undefined}
           >
-            <span className="steps__num">{i < step ? "✓" : i + 1}</span>
+            <span className="steps__num">{i < step ? <Check /> : i + 1}</span>
             {label}
           </button>
         ))}
@@ -252,7 +254,7 @@ export function NewGamePage() {
           <h1>¿Cómo quieres narrar?</h1>
           <div className="grid">
             <ModeCard
-              icon="📖"
+              icon={<BookOpen />}
               title="Manual"
               text="Tú eliges los personajes de la bolsa (o pides un reparto al azar). Control total."
               selected={mode === "manual"}
@@ -262,7 +264,7 @@ export function NewGamePage() {
               }}
             />
             <ModeCard
-              icon="🔮"
+              icon={<Sparkles />}
               title="Con IA"
               text="La IA prepara un reparto equilibrado según el estilo que pidas, te explica por qué y te aconseja durante la partida."
               selected={mode === "ai"}
@@ -288,22 +290,21 @@ export function NewGamePage() {
             {scripts.data?.map((s) => (
               <button
                 key={s.id}
-                className={`card card--interactive ${script?.id === s.id ? "card--selected" : ""}`}
+                className={`card card--interactive edition-card ${script?.id === s.id ? "card--selected" : ""}`}
                 disabled={openingLobby}
                 onClick={() => void chooseScript(s)}
               >
-                <div className="row">
-                  <h3 style={{ margin: 0 }}>{s.name}</h3>
-                  {s.official && <span className="badge team-fabled">Oficial</span>}
-                </div>
-                <p className="muted small" style={{ margin: "6px 0 0" }}>
-                  {s.description ? `${s.description.slice(0, 120)}${s.description.length > 120 ? "…" : ""}` : s.author}
-                </p>
-                {s.recommendedMinPlayers && s.recommendedMinPlayers > 5 && (
-                  <p className="small team-fabled" style={{ margin: "6px 0 0" }}>
-                    Recomendado con {s.recommendedMinPlayers} o más jugadores
+                <EditionBanner scriptId={s.id} name={s.name} />
+                <div className="edition-card__body">
+                  <p className="muted small" style={{ margin: 0 }}>
+                    {s.description ? `${s.description.slice(0, 120)}${s.description.length > 120 ? "…" : ""}` : s.author || "Guion personalizado"}
                   </p>
-                )}
+                  {s.recommendedMinPlayers && s.recommendedMinPlayers > 5 && (
+                    <p className="small team-fabled" style={{ margin: "6px 0 0" }}>
+                      Recomendado con {s.recommendedMinPlayers} o más jugadores
+                    </p>
+                  )}
+                </div>
               </button>
             ))}
           </div>
@@ -404,7 +405,7 @@ export function NewGamePage() {
               <div className="chips">
                 {STYLES.map((s) => (
                   <button key={s.id} className="chip" aria-pressed={style === s.id} onClick={() => setStyle(s.id)}>
-                    {s.label}
+                    {s.icon} {s.label}
                   </button>
                 ))}
               </div>
@@ -415,7 +416,7 @@ export function NewGamePage() {
                 onChange={(e) => setExtra(e.target.value)}
               />
               <button className="btn btn--primary btn--block" onClick={askAi} disabled={aiLoading}>
-                {aiLoading ? "La IA está pensando…" : selected.length ? "🔮 Otra propuesta" : "🔮 Preparar reparto con IA"}
+                <Sparkles /> {aiLoading ? "La IA está pensando…" : selected.length ? "Otra propuesta" : "Preparar reparto con IA"}
               </button>
             </div>
           )}
@@ -433,7 +434,7 @@ export function NewGamePage() {
                 </ul>
               )}
               <button className="btn btn--small" style={{ alignSelf: "flex-start" }} onClick={() => setEditingAi(true)}>
-                ✏️ Retocar a mano
+                <Pencil /> Retocar a mano
               </button>
             </div>
           )}
@@ -446,7 +447,7 @@ export function NewGamePage() {
                 </div>
                 <div className="row" style={{ marginTop: 8 }}>
                   <button className="btn btn--small btn--gold" onClick={randomize}>
-                    🎲 Al azar
+                    <Dices /> Al azar
                   </button>
                   <button className="btn btn--small btn--ghost" onClick={resetSelection} disabled={!selected.length}>
                     Vaciar
@@ -522,14 +523,14 @@ export function NewGamePage() {
           </div>
           <div className="grid">
             <ModeCard
-              icon="👜"
+              icon={<Shuffle />}
               title="Sacar de la bolsa"
               text="Los personajes se reparten al azar entre los asientos, como en la mesa."
               selected={!manualSeats}
               onClick={() => setManualSeats(false)}
             />
             <ModeCard
-              icon="✍️"
+              icon={<PenLine />}
               title="Asignar a mano"
               text="Ya habéis sacado las fichas físicas: indica qué le tocó a cada uno."
               selected={manualSeats}
@@ -585,7 +586,7 @@ export function NewGamePage() {
   );
 }
 
-function ModeCard(props: { icon: string; title: string; text: string; selected: boolean; disabled?: boolean; onClick: () => void }) {
+function ModeCard(props: { icon: ReactNode; title: string; text: string; selected: boolean; disabled?: boolean; onClick: () => void }) {
   return (
     <button
       className={`card card--interactive mode-card ${props.selected ? "card--selected" : ""}`}
@@ -635,7 +636,7 @@ function DecoyAndBluffs(props: {
         const options = pool.filter((c) => c.team === team && (c.id === shown || !taken.has(c.id)));
         return (
           <label key={id} className="field">
-            <span>🎭 {name(id)} cree ser</span>
+            <span><VenetianMask /> {name(id)} cree ser</span>
             <select className="input" value={shown} onChange={(e) => props.onDecoy(id, e.target.value)}>
               {options.map((c) => (
                 <option key={c.id} value={c.id}>

@@ -1,37 +1,57 @@
 /* Estética de Ravenswood Bluff: noche, sangre, oro viejo y pergamino. */
+/* Tipografía de títulos del juego (Dumbledor), servida por la wiki de Villacuervos. */
+@font-face {
+  font-family: "Dumbledor";
+  src: url("https://villacuervos.es/assets/dum2-regular-7sggDAx6.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Dumbledor";
+  src: url("https://villacuervos.es/assets/dum2-wide-DrFsF3NV.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
-  --bg: #0b0809;
-  --bg-2: #120d0f;
-  --surface: #1a1315;
-  --surface-2: #231a1c;
-  --surface-3: #2e2225;
-  --line: #3d2e2b;
-  --line-strong: #5a4434;
-  --text: #ecdfc4;
-  --text-strong: #fbf3e0;
-  --muted: #a8977c;
-  --gold: #c9a35b;
-  --gold-bright: #e6c784;
-  --blood: #9b111e;
-  --blood-bright: #d12a35;
-  --parchment: #e8dcc0;
+  --bg: #140e1b;
+  --bg-2: #1b1424;
+  --surface: #241a2f;
+  --surface-2: #2c2138;
+  --surface-3: #382a47;
+  --line: #3e3150;
+  --line-strong: #5b4a72;
+  --text: #efe6d6;
+  --text-strong: #fff8ea;
+  --muted: #b2a5bf;
+  --gold: #cfa04a;
+  --gold-bright: #ecc878;
+  --blood: #8e1120;
+  --blood-bright: #c8252f;
+  --accent: #6d3fae;
+  --accent-deep: #4a2479;
+  --accent-bright: #a77ce6;
+  --parchment: #ece0c2;
   --ink: #2a1d14;
 
-  --townsfolk: #5aa2ff;
+  --townsfolk: #4f9bff;
   --outsider: #7fd0f0;
   --minion: #ef6a4f;
   --demon: #e0242f;
   --traveller: #b48be8;
   --fabled: #e8b84a;
   --loric: #7ccf7f;
-  --good: #5aa2ff;
+  --good: #4f9bff;
   --evil: #e0242f;
 
-  --radius: 14px;
-  --radius-sm: 9px;
-  --shadow: 0 10px 30px rgb(0 0 0 / 0.45);
-  --font-display: "Cinzel", "Times New Roman", serif;
-  --font-body: "EB Garamond", Georgia, serif;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 10px 30px rgb(0 0 0 / 0.5);
+  --font-display: "Dumbledor", "IM Fell English SC", Georgia, serif;
+  --font-body: "Sorts Mill Goudy", "EB Garamond", Georgia, serif;
+  --font-ui: "Oswald", "Arial Narrow", sans-serif;
+  --paper-grain: url("https://villacuervos.es/img/paper/grain-dark.png");
   color-scheme: dark;
 }
 
@@ -48,11 +68,7 @@ body,
 body {
   margin: 0;
   overflow-x: clip;
-  background:
-    radial-gradient(ellipse at 50% -10%, rgb(155 17 30 / 0.28), transparent 55%),
-    radial-gradient(ellipse at 50% 120%, rgb(201 163 91 / 0.08), transparent 60%),
-    var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
   font-size: 17px;
@@ -61,14 +77,28 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Fondo fijo en una capa aparte: background-attachment: fixed va a trompicones en el móvil. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 120% 70% at 50% -10%, rgb(124 72 196 / 0.45), transparent 60%),
+    radial-gradient(ellipse 90% 60% at 100% 100%, rgb(88 40 140 / 0.35), transparent 60%),
+    radial-gradient(ellipse 80% 50% at 0% 80%, rgb(60 26 100 / 0.4), transparent 60%),
+    linear-gradient(180deg, #1d1230 0%, #140e1b 55%, #0f0a15 100%);
+}
+
 h1,
 h2,
 h3,
 h4 {
   font-family: var(--font-display);
   color: var(--text-strong);
-  letter-spacing: 0.04em;
-  line-height: 1.2;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
   margin: 0 0 0.5em;
 }
 
@@ -173,7 +203,7 @@ textarea {
   border-radius: var(--radius-sm);
   color: var(--muted);
   text-decoration: none;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 0.66rem;
   letter-spacing: 0.06em;
 }
@@ -242,7 +272,8 @@ textarea {
 /* ---------- Tarjetas y paneles ---------- */
 
 .card {
-  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  background: var(--paper-grain), linear-gradient(180deg, var(--surface-2), var(--surface));
+  background-size: 400px, auto;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 14px;
@@ -295,7 +326,7 @@ textarea {
   border: 1px solid var(--line-strong);
   background: var(--surface-2);
   color: var(--text);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -324,15 +355,25 @@ textarea {
 }
 
 .btn--primary {
-  background: linear-gradient(180deg, var(--blood-bright), var(--blood));
-  border-color: #c23a3f;
-  color: #fff4ea;
-  box-shadow: 0 6px 18px rgb(155 17 30 / 0.4);
+  background: linear-gradient(180deg, #7f50c2, var(--accent-deep));
+  border-color: #9a72d8;
+  color: #fff8ea;
+  box-shadow: 0 6px 18px rgb(74 36 121 / 0.55);
 }
 
 .btn--primary:hover:not(:disabled) {
-  border-color: #ff8a8a;
+  border-color: var(--accent-bright);
   color: #fff;
+}
+
+.btn--danger {
+  background: rgb(142 17 32 / 0.18);
+  border-color: rgb(200 37 47 / 0.6);
+  color: #ffd9d9;
+}
+
+.btn--danger:hover:not(:disabled) {
+  border-color: var(--blood-bright);
 }
 
 .btn--gold {
@@ -377,7 +418,7 @@ textarea {
 }
 
 .field > span {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -461,7 +502,7 @@ textarea.input {
   display: inline-block;
   padding: 1px 10px;
   border-radius: 999px;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -678,7 +719,7 @@ button.token {
 }
 
 .counter {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-weight: 700;
   font-size: 0.9rem;
 }
@@ -774,7 +815,7 @@ button.token {
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--bg-2);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 0.8rem;
   letter-spacing: 0.04em;
 }
@@ -821,7 +862,7 @@ button.token {
   border-radius: 999px;
   border: 1px solid var(--line);
   color: var(--muted);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 0.75rem;
   letter-spacing: 0.06em;
   white-space: nowrap;
@@ -849,7 +890,7 @@ button.token {
 }
 
 .steps__item--current .steps__num {
-  background: var(--blood);
+  background: var(--accent);
   color: #fff;
 }
 
@@ -929,7 +970,7 @@ button.token {
   width: 30px;
   text-align: right;
   color: var(--muted);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 0.85rem;
 }
 
@@ -956,7 +997,7 @@ button.token {
   gap: 8px;
   padding: 6px 16px;
   border-radius: 999px;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-weight: 700;
   letter-spacing: 0.08em;
   border: 1px solid var(--line-strong);
@@ -988,7 +1029,7 @@ button.token {
   inset: 9%;
   border-radius: 50%;
   border: 1px dashed var(--line-strong);
-  background: radial-gradient(circle, rgb(155 17 30 / 0.1), transparent 70%);
+  background: radial-gradient(circle, rgb(124 72 196 / 0.16), transparent 70%);
 }
 
 .seat {
@@ -1074,27 +1115,27 @@ button.token {
 
 .big-number {
   font-family: var(--font-display);
-  font-size: 1.6rem;
-  font-weight: 900;
+  font-size: 1.35rem;
   line-height: 1;
   color: var(--text-strong);
 }
 
 .stat-row {
   display: flex;
-  gap: 18px;
+  gap: 12px;
   justify-content: center;
+  font-size: 0.8rem;
 }
 
 .stat {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  align-items: baseline;
+  gap: 4px;
 }
 
 .stat span {
   font-size: 0.72rem;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   letter-spacing: 0.08em;
   color: var(--muted);
   text-transform: uppercase;
@@ -1124,7 +1165,7 @@ button.token {
   border: 0;
   background: none;
   color: var(--muted);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1135,7 +1176,7 @@ button.token {
 
 .tab[aria-selected="true"] {
   color: var(--text-strong);
-  border-bottom-color: var(--blood-bright);
+  border-bottom-color: var(--gold-bright);
 }
 
 .panel__body {
@@ -1215,7 +1256,7 @@ button.token {
   border: 1px solid var(--gold);
   border-radius: var(--radius);
   padding: 16px;
-  background: radial-gradient(ellipse at top, rgb(58 74 138 / 0.25), transparent 70%), var(--surface);
+  background: radial-gradient(ellipse at top, rgb(124 72 196 / 0.22), transparent 70%), var(--surface);
   margin-bottom: 14px;
 }
 
@@ -1275,7 +1316,7 @@ button.token {
 
 .meter > div {
   height: 100%;
-  background: linear-gradient(90deg, var(--gold), var(--blood-bright));
+  background: linear-gradient(90deg, var(--accent-bright), var(--gold-bright));
   transition: width 0.2s;
 }
 
@@ -1300,7 +1341,7 @@ button.token {
   border-radius: var(--radius);
   margin-bottom: 16px;
   border: 1px solid var(--gold);
-  background: linear-gradient(90deg, rgb(201 163 91 / 0.18), rgb(155 17 30 / 0.18));
+  background: linear-gradient(90deg, rgb(201 163 91 / 0.18), rgb(124 72 196 / 0.2));
 }
 
 .banner--good {
@@ -1394,7 +1435,7 @@ button.token {
 }
 
 .section-title {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 0.78rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1422,7 +1463,7 @@ button.token {
   width: 120px;
   height: 120px;
   margin: 0 auto 18px;
-  filter: drop-shadow(0 0 30px rgb(155 17 30 / 0.55));
+  filter: drop-shadow(0 0 30px rgb(124 72 196 / 0.6));
 }
 
 .hero p {
@@ -1505,7 +1546,7 @@ button.token {
 }
 
 .input--code {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: 0.3em;
@@ -1552,6 +1593,258 @@ button.token {
   padding: 0;
   cursor: pointer;
   border-radius: 50%;
+}
+
+/* ---------- Iconos (lucide) ---------- */
+
+.lucide {
+  width: 1.15em;
+  height: 1.15em;
+  stroke-width: 1.8;
+  vertical-align: -0.2em;
+  flex-shrink: 0;
+}
+
+.nav__icon .lucide {
+  width: 22px;
+  height: 22px;
+}
+
+.mode-card__icon .lucide {
+  width: 36px;
+  height: 36px;
+  color: var(--gold-bright);
+  stroke-width: 1.4;
+}
+
+.icon-btn .lucide {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---------- Cabeceras de edición (damasco de la wiki) ---------- */
+
+.edition-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.edition-banner {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 92px;
+  padding: 14px 16px 10px;
+  background:
+    radial-gradient(ellipse at 50% 120%, rgb(124 72 196 / 0.55), transparent 70%),
+    linear-gradient(160deg, #3b2160, #1d1230);
+}
+
+.edition-banner h3 {
+  margin: 0;
+  font-size: 1.45rem;
+  color: #fff;
+  text-shadow: 0 2px 6px rgb(0 0 0 / 0.9);
+}
+
+.edition-banner--logo {
+  justify-content: center;
+  align-items: center;
+  min-height: 150px;
+  padding: 8px;
+}
+
+.edition-banner__logo {
+  width: auto;
+  height: 140px;
+  max-width: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.6));
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.step-icon {
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.night-card__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.night-item .token {
+  cursor: inherit;
+}
+
+.edition-card__body {
+  padding: 12px 16px 16px;
+}
+
+/* ---------- Hojas: cabecera con cerrar ---------- */
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.sheet__head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 8px 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  touch-action: none;
+}
+
+.sheet__head .sheet__grip {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  translate: -50% 0;
+  margin: 0;
+}
+
+.sheet__title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet__close {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sheet__body {
+  padding: 14px 16px max(20px, env(safe-area-inset-bottom));
+}
+
+.player-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.more {
+  margin-top: 18px;
+}
+
+.more summary {
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.action-bar--sheet {
+  margin: 16px -16px 0;
+  padding-left: 16px;
+  padding-right: 16px;
+  background: linear-gradient(180deg, transparent, var(--surface) 30%);
+}
+
+/* ---------- Toca una ficha ---------- */
+
+.pick-banner {
+  position: sticky;
+  top: 51px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 16px;
+  margin-bottom: 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gold-bright);
+  background: rgb(44 33 56 / 0.96);
+  box-shadow: var(--shadow);
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--gold-bright);
+}
+
+.pick-banner span {
+  flex: 1;
+}
+
+.circle__note {
+  max-width: 100%;
+  font-size: 0.85rem;
+  color: var(--gold-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-reminders {
+  margin: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chip--reminder {
+  background: var(--parchment);
+  border-color: #c9b48a;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.chip--reminder button {
+  color: var(--ink);
+}
+
+.chip--suggest {
+  border-color: var(--blood-bright);
+  box-shadow: 0 0 0 1px var(--blood-bright);
+}
+
+.chip[aria-pressed="true"] .lucide {
+  color: var(--blood-bright);
+}
+
+.seat-row__kind .lucide {
+  width: 15px;
+  height: 15px;
+  margin-left: 4px;
+}
+
+.pick__flag .lucide {
+  width: 13px;
+  height: 13px;
 }
 
 /* ---------- Avisos ---------- */
@@ -1626,7 +1919,7 @@ button.token {
   }
 
   .big-number {
-    font-size: 2.2rem;
+    font-size: 1.8rem;
   }
 
   .wizard-footer {

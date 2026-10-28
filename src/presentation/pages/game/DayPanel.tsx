@@ -2,23 +2,22 @@ import type { Game } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { useState } from "react";
 import { Confirm } from "../../components/Sheet";
+import { Gavel, Ghost, Hand, Moon } from "lucide-react";
 
 interface Props {
   game: Game;
-  newId: () => string;
   onChange: (mutate: (g: Game) => Game) => void;
+  /** Nominar tocando en el Grimorio: primero quién nomina y después a quién. */
+  onStartNomination: () => void;
 }
 
 /** Nominaciones, votos y ejecución. El orden de voto empieza a la izquierda del nominado. */
-export function DayPanel({ game, newId, onChange }: Props) {
-  const [nominator, setNominator] = useState("");
-  const [nominee, setNominee] = useState("");
+export function DayPanel({ game, onChange, onStartNomination }: Props) {
   const [confirmDusk, setConfirmDusk] = useState(false);
   const name = (id: string) => game.players.find((p) => p.id === id)?.name ?? "?";
   const threshold = rules.voteThreshold(game);
   const open = game.nominations.find((n) => !n.closed);
   const block = rules.onTheBlock(game);
-  const problem = nominator && nominee ? rules.canNominate(game, nominator, nominee) : null;
 
   const voteOrder = (nomineeId: string) => {
     const seat = game.players.find((p) => p.id === nomineeId)!.seat;
@@ -58,7 +57,7 @@ export function DayPanel({ game, newId, onChange }: Props) {
                   onClick={() => onChange((g) => rules.toggleVote(g, open.id, p.id))}
                 >
                   <span className="hand" aria-hidden>
-                    {on ? "✋" : p.alive ? "·" : "👻"}
+                    {on ? <Hand /> : p.alive ? null : <Ghost />}
                   </span>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
                 </button>
@@ -77,47 +76,13 @@ export function DayPanel({ game, newId, onChange }: Props) {
           </button>
         </div>
       ) : (
-        <div className="card stack" style={{ boxShadow: "none" }}>
-          <h3 style={{ margin: 0 }}>Nueva nominación</h3>
-          <label className="field">
-            <span>Quién nomina</span>
-            <select className="input" value={nominator} onChange={(e) => setNominator(e.target.value)}>
-              <option value="">— Elige —</option>
-              {game.players
-                .filter((p) => p.alive && !game.nominations.some((n) => n.nominatorId === p.id))
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.seat + 1}. {p.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>A quién</span>
-            <select className="input" value={nominee} onChange={(e) => setNominee(e.target.value)}>
-              <option value="">— Elige —</option>
-              {game.players
-                .filter((p) => !game.nominations.some((n) => n.nomineeId === p.id))
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.seat + 1}. {p.name}
-                    {p.alive ? "" : " ☠"}
-                  </option>
-                ))}
-            </select>
-          </label>
-          {problem && <div className="alert alert--warning small">{problem}</div>}
-          <button
-            className="btn btn--primary"
-            disabled={!nominator || !nominee || !!problem}
-            onClick={() => {
-              onChange((g) => rules.nominate(g, nominator, nominee, newId()));
-              setNominator("");
-              setNominee("");
-            }}
-          >
-            Nominar
+        <div className="stack" style={{ gap: 8 }}>
+          <button className="btn btn--primary btn--big" onClick={onStartNomination}>
+            <Gavel /> Nueva nominación
           </button>
+          <p className="muted small" style={{ margin: 0, textAlign: "center" }}>
+            Después toca en el Grimorio a quien nomina y a quien es nominado.
+          </p>
         </div>
       )}
 
@@ -160,7 +125,7 @@ export function DayPanel({ game, newId, onChange }: Props) {
           </button>
         )}
         <button className="btn" disabled={!!open} onClick={endDay}>
-          ☾ Anochecer
+          <Moon /> Anochecer
         </button>
       </div>
 

@@ -3,12 +3,17 @@ import type { Game } from "@domain/entities/Game";
 import { alivePlayers, phaseLabel, voteThreshold } from "@domain/services/GameRules";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Token } from "../../components/Token";
+import { Moon, Sun } from "lucide-react";
 
 interface Props {
   game: Game;
   characters: Map<string, Character>;
   highlighted: string[];
   hidden: boolean;
+  /** Modo «toca una ficha»: se apagan las que no se pueden elegir. */
+  picking?: boolean;
+  /** Línea bajo la fase (el paso de la noche en el que se va). */
+  centerNote?: string;
   onSelect: (playerId: string) => void;
 }
 
@@ -25,7 +30,7 @@ function useWidth<T extends HTMLElement>() {
 }
 
 /** Los jugadores en círculo, como en la mesa, empezando arriba y en el sentido de las agujas del reloj. */
-export function Grimoire({ game, characters, highlighted, hidden, onSelect }: Props) {
+export function Grimoire({ game, characters, highlighted, hidden, picking, centerNote, onSelect }: Props) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const n = game.players.length;
   // Las fichas crecen hasta donde caben sin pisarse, y el radio se encoge para que no se salgan por los lados.
@@ -37,8 +42,9 @@ export function Grimoire({ game, characters, highlighted, hidden, onSelect }: Pr
     <div className="circle" ref={ref} style={{ "--size": `${size}px` } as CSSProperties}>
       <div className="circle__center">
         <div className={`phase-pill phase-pill--${game.phase.kind}`}>
-          {game.phase.kind === "night" ? "☾" : "☀"} {phaseLabel(game.phase)}
+          {game.phase.kind === "night" ? <Moon /> : <Sun />} {phaseLabel(game.phase)}
         </div>
+        {centerNote && <div className="circle__note">{centerNote}</div>}
         <div className="stat-row">
           <div className="stat">
             <span className="big-number">{alive}</span>
@@ -46,7 +52,7 @@ export function Grimoire({ game, characters, highlighted, hidden, onSelect }: Pr
           </div>
           <div className="stat">
             <span className="big-number">{voteThreshold(game)}</span>
-            <span>para ejecutar</span>
+            <span title="Votos necesarios para ejecutar">votos</span>
           </div>
         </div>
       </div>
@@ -62,6 +68,7 @@ export function Grimoire({ game, characters, highlighted, hidden, onSelect }: Pr
               alignment={p.alignment}
               size={size}
               dead={!p.alive}
+              dim={picking && !highlighted.includes(p.id)}
               hidden={hidden}
               glow={highlighted.includes(p.id)}
               onClick={() => onSelect(p.id)}
@@ -73,7 +80,7 @@ export function Grimoire({ game, characters, highlighted, hidden, onSelect }: Pr
             </span>
             {!hidden && (p.reminders.length > 0 || p.shownCharacterId) && (
               <div className="seat__meta">
-                {p.shownCharacterId && <span className="reminder-dot">🎭 {characters.get(p.shownCharacterId)?.name}</span>}
+                {p.shownCharacterId && <span className="reminder-dot">Cree: {characters.get(p.shownCharacterId)?.name}</span>}
                 {p.reminders.map((r) => (
                   <span key={r.id} className="reminder-dot">
                     {r.label}

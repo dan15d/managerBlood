@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { Token } from "../components/Token";
+import { Check } from "lucide-react";
 
 /**
  * Pasar el móvil: cada jugador ve en secreto el personaje que cree ser (el Borracho ve su
@@ -85,7 +86,7 @@ export function RevealPage() {
             <span className="game-row__title" style={{ flex: 1 }}>
               {p.name}
             </span>
-            {seen.includes(p.id) ? <span className="team-loric">✓ Visto</span> : <span className="muted small">Pendiente</span>}
+            {seen.includes(p.id) ? <span className="team-loric"><Check /> Visto</span> : <span className="muted small">Pendiente</span>}
           </button>
         ))}
       </div>

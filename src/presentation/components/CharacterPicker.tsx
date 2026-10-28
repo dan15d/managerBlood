@@ -3,6 +3,7 @@ import { TEAM_LABEL } from "@domain/entities/Character";
 import { DECOYS, SETUP_MODIFIERS, type Distribution } from "@domain/services/SetupRules";
 import { useState } from "react";
 import { Token } from "./Token";
+import { Settings2, VenetianMask } from "lucide-react";
 
 const TEAM_ORDER: Team[] = ["townsfolk", "outsider", "minion", "demon", "traveller", "fabled", "loric"];
 
@@ -64,8 +65,8 @@ export function CharacterPicker({ characters, selected, onToggle, target, teams 
                     <span className="pick__body">
                       <span className="pick__name">{c.name}</span>
                       <span className="pick__ability">{c.ability}</span>
-                      {SETUP_MODIFIERS[c.id] && <span className="pick__flag">⚙ {SETUP_MODIFIERS[c.id].note}</span>}
-                      {DECOYS[c.id] && <span className="pick__flag">🎭 No sabe quién es</span>}
+                      {SETUP_MODIFIERS[c.id] && <span className="pick__flag"><Settings2 /> {SETUP_MODIFIERS[c.id].note}</span>}
+                      {DECOYS[c.id] && <span className="pick__flag"><VenetianMask /> No sabe quién es</span>}
                     </span>
                   </button>
                 );

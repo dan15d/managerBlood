@@ -12,8 +12,15 @@ import { DayPanel } from "./DayPanel";
 import { Grimoire } from "./Grimoire";
 import { NightPanel } from "./NightPanel";
 import { PlayerSheet } from "./PlayerSheet";
+import { ArrowLeft, Eye, EyeOff, Moon, ScrollText, Smartphone, Sparkles, Sun } from "lucide-react";
 
 type Tab = "phase" | "ai" | "log";
+
+/** Modo «toca una ficha»: poner un recordatorio o nominar sin abrir la hoja del jugador. */
+type Pick =
+  | { kind: "reminder"; sourceId: string; label: string }
+  | { kind: "nominator" }
+  | { kind: "nominee"; nominatorId: string };
 
 export function GamePage() {
   const { id } = useParams();
@@ -26,6 +33,7 @@ export function GamePage() {
   const [hidden, setHidden] = useState(false);
   const [editingBluffs, setEditingBluffs] = useState(false);
   const [dismissedHint, setDismissedHint] = useState("");
+  const [pick, setPick] = useState<Pick | null>(null);
   const characters = app.catalog.map();
   const saving = useRef(Promise.resolve());
   const gameRef = useRef<Game | null>(null);
@@ -83,12 +91,47 @@ export function GamePage() {
   const player = selected ? game.players.find((p) => p.id === selected) : undefined;
   const hint = rules.victoryHint(game, characters);
   const hintKey = hint ? `${hint.winner}:${game.players.map((p) => +p.alive).join("")}` : "";
+  const name = (pid: string) => game.players.find((p) => p.id === pid)?.name ?? "";
+
+  const tapPlayer = (pid: string) => {
+    if (!pick) return setSelected(pid);
+    if (pick.kind === "reminder") {
+      change((g) => rules.addReminder(g, pid, { id: app.newId(), sourceCharacterId: pick.sourceId, label: pick.label }));
+      toast(`«${pick.label}» en ${name(pid)}.`);
+      return setPick(null);
+    }
+    if (pick.kind === "nominator") {
+      const problem = rules.canNominate(game, pid, "");
+      if (problem) return toast(problem, "error");
+      return setPick({ kind: "nominee", nominatorId: pid });
+    }
+    const problem = rules.canNominate(game, pick.nominatorId, pid);
+    if (problem) return toast(problem, "error");
+    change((g) => rules.nominate(g, pick.nominatorId, pid, app.newId()));
+    setPick(null);
+    setTab("phase");
+  };
+
+  const pickText = !pick
+    ? null
+    : pick.kind === "reminder"
+      ? `Toca al jugador para poner «${pick.label}»`
+      : pick.kind === "nominator"
+        ? "Toca a quien nomina"
+        : `${name(pick.nominatorId)} nomina a… toca al nominado`;
+  // Durante la nominación se resaltan quienes pueden nominar o ser nominados.
+  const highlighted =
+    pick?.kind === "nominator"
+      ? game.players.filter((p) => p.alive && !game.nominations.some((n) => n.nominatorId === p.id)).map((p) => p.id)
+      : pick?.kind === "nominee"
+        ? game.players.filter((p) => !game.nominations.some((n) => n.nomineeId === p.id)).map((p) => p.id)
+        : (step?.playerIds ?? []);
 
   return (
     <main className="page page--wide page--flow">
       <div className="game-bar">
         <Link to="/" className="btn btn--ghost icon-btn" aria-label="Volver a partidas">
-          ←
+          <ArrowLeft />
         </Link>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -105,17 +148,18 @@ export function GamePage() {
           onClick={() => setHidden(!hidden)}
           title="Oculta los personajes por si alguien mira la pantalla"
         >
-          {hidden ? "👁" : "🙈"}
+          {hidden ? <Eye /> : <EyeOff />}
           <span className="label-wide">{hidden ? " Mostrar" : " Ocultar"}</span>
         </button>
         <Link to={`/partida/${game.id}/revelar`} className="btn btn--small" aria-label="Repartir personajes">
-          🎭<span className="label-wide"> Repartir</span>
+          <Smartphone />
+          <span className="label-wide"> Repartir</span>
         </Link>
       </div>
 
       {game.status === "finished" ? (
         <div className={`banner banner--${game.winner}`}>
-          <h2 style={{ flex: 1 }}>{game.winner === "good" ? "😇 Ha ganado el Bien" : "😈 Ha ganado el Mal"}</h2>
+          <h2 style={{ flex: 1 }}>{game.winner === "good" ? "Ha ganado el Bien" : "Ha ganado el Mal"}</h2>
           <button className="btn btn--small" onClick={() => change(rules.reopen)}>
             Reabrir
           </button>
@@ -138,25 +182,36 @@ export function GamePage() {
         )
       )}
 
+      {pickText && (
+        <div className="pick-banner" role="status">
+          <span>{pickText}</span>
+          <button className="btn btn--small" onClick={() => setPick(null)}>
+            Cancelar
+          </button>
+        </div>
+      )}
+
       <div className="game-layout">
         <Grimoire
           game={game}
           characters={characters}
           hidden={hidden}
-          highlighted={step?.playerIds ?? []}
-          onSelect={(pid) => setSelected(pid)}
+          highlighted={highlighted}
+          picking={!!pick}
+          centerNote={night && step ? `${Math.min(game.nightStep, steps.length - 1) + 1}/${steps.length} · ${step.title}` : undefined}
+          onSelect={tapPlayer}
         />
 
         <section className="card panel">
           <div className="tabs" role="tablist">
             <button className="tab" role="tab" aria-selected={tab === "phase"} onClick={() => setTab("phase")}>
-              {night ? "☾ Noche" : "☀ Día"}
+              {night ? <Moon /> : <Sun />} {night ? "Noche" : "Día"}
             </button>
             <button className="tab" role="tab" aria-selected={tab === "ai"} onClick={() => setTab("ai")}>
-              🔮 IA
+              <Sparkles /> IA
             </button>
             <button className="tab" role="tab" aria-selected={tab === "log"} onClick={() => setTab("log")}>
-              📜 Registro
+              <ScrollText /> Registro
             </button>
           </div>
           <div className="panel__body">
@@ -169,9 +224,20 @@ export function GamePage() {
                   onChange={change}
                   onOpenPlayer={setSelected}
                   onEditBluffs={() => setEditingBluffs(true)}
+                  onPickReminder={(sourceId, label) => {
+                    setPick({ kind: "reminder", sourceId, label });
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                 />
               ) : (
-                <DayPanel game={game} newId={app.newId} onChange={change} />
+                <DayPanel
+                  game={game}
+                  onChange={change}
+                  onStartNomination={() => {
+                    setPick({ kind: "nominator" });
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                />
               ))}
             {tab === "ai" && <AiPanel game={game} />}
             {tab === "log" && (
@@ -202,8 +268,7 @@ export function GamePage() {
       )}
 
       {editingBluffs && (
-        <Sheet onClose={() => setEditingBluffs(false)} label="Faroles del Demonio">
-          <h2>Faroles del Demonio</h2>
+        <Sheet onClose={() => setEditingBluffs(false)} title="Faroles del Demonio" label="Faroles del Demonio">
           <p className="muted small">Elige 3 personajes buenos que no estén en juego ({game.demonBluffs.length}/3).</p>
           <CharacterPicker
             characters={scriptCharacters.filter(
