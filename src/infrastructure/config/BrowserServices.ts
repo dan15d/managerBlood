@@ -29,7 +29,8 @@ export class LocalSettingsStore implements SettingsStore {
     const defaults: AppSettings = {
       openRouterKey: "",
       aiModel: env.aiModel,
-      aiTransport: hasSupabase() ? "cloud" : "browser",
+      // La función en la nube hay que desplegarla aparte (README); hasta entonces, la clave del navegador.
+      aiTransport: "browser",
     };
     try {
       return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") };
