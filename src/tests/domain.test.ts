@@ -5,6 +5,7 @@ import * as rules from "@domain/services/GameRules";
 import { buildNightOrder } from "@domain/services/NightOrder";
 import { seededRandom } from "@domain/services/Random";
 import { pickBluffs, pickDecoys, randomSelection } from "@domain/services/SetupGenerator";
+import { seatSecret } from "@domain/services/TableView";
 import { allowedDistributions, baseDistribution, validateSelection } from "@domain/services/SetupRules";
 
 const catalog = new StaticCharacterCatalog();
@@ -138,5 +139,48 @@ describe("orden de la noche", () => {
   it("con 5 jugadores no hay información del Mal", () => {
     const g = game(["washerwoman", "chef", "empath", "poisoner", "imp"], { phase: { kind: "night", number: 1 } });
     expect(buildNightOrder(g, catalog.map()).some((s) => s.kind === "minion_info")).toBe(false);
+  });
+});
+
+describe("lo que ve cada jugador", () => {
+  const map = catalog.map();
+  const seat = (characterId: string, shownCharacterId?: string): Player => ({
+    id: "p",
+    seat: 0,
+    name: "J",
+    characterId,
+    shownCharacterId,
+    alignment: ["minion", "demon"].includes(catalog.get(characterId)!.team) ? "evil" : "good",
+    alive: true,
+    ghostVoteUsed: false,
+    reminders: [],
+  });
+
+  it("el Borracho ve el Aldeano que cree ser, como Bueno, nunca «Borracho»", () => {
+    expect(seatSecret(seat("drunk", "empath"), map)).toEqual({ characterId: "empath", alignment: "good" });
+  });
+
+  it("el Lunático ve el Demonio que cree ser, como Malvado", () => {
+    expect(seatSecret(seat("lunatic", "imp"), map)).toEqual({ characterId: "imp", alignment: "evil" });
+  });
+
+  it("si al Borracho no se le ha dado personaje falso, no ve nada", () => {
+    expect(seatSecret(seat("drunk"), map)).toEqual({});
+    expect(seatSecret(seat("marionette"), map)).toEqual({});
+  });
+
+  it("el resto ve su personaje y su bando (también si ha cambiado de bando)", () => {
+    expect(seatSecret(seat("chef"), map)).toEqual({ characterId: "chef", alignment: "good" });
+    expect(seatSecret({ ...seat("chef"), alignment: "evil" }, map)).toEqual({ characterId: "chef", alignment: "evil" });
+  });
+
+  it("al repartir, el Borracho recibe su Aldeano falso y queda en el Grimorio como Borracho", () => {
+    const pool = scriptPool("trouble-brewing");
+    const bag = chars(["drunk", "chef", "empath", "poisoner", "imp"]);
+    const decoys = pickDecoys(bag, pool, seededRandom(3));
+    const shown = catalog.get(decoys.drunk)!;
+    expect(shown.team).toBe("townsfolk");
+    expect(bag.some((c) => c.id === shown.id)).toBe(false);
+    expect(seatSecret(seat("drunk", shown.id), map).characterId).toBe(shown.id);
   });
 });

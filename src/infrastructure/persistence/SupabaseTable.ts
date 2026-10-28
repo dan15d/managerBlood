@@ -193,8 +193,8 @@ export class SupabaseTablePublisher implements TablePublisher {
         seat: p.seat,
         player_name: p.name,
         user_id: p.userId ?? null,
-        shown_character_id: secret.characterId,
-        shown_alignment: secret.alignment,
+        shown_character_id: secret.characterId ?? null,
+        shown_alignment: secret.alignment ?? null,
         alive: p.alive,
         ghost_vote_used: p.ghostVoteUsed,
       };

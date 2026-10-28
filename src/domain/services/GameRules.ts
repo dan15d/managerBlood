@@ -59,6 +59,16 @@ export const setAlignment = (game: Game, playerId: string, alignment: Alignment)
 export const renamePlayer = (game: Game, playerId: string, name: string): Game =>
   touch(updatePlayer(game, playerId, (p) => ({ ...p, name: name.trim() || p.name })));
 
+/** Qué personaje cree ser quien no sabe el suyo (Borracho, Lunático, Marioneta). */
+export function setShownCharacter(game: Game, playerId: string, shown: Character | undefined): Game {
+  const player = findPlayer(game, playerId);
+  if (!player) throw new RuleViolation("Ese jugador no está en la partida.");
+  return touch(
+    updatePlayer(game, playerId, (p) => ({ ...p, shownCharacterId: shown?.id })),
+    shown ? `${player.name} cree ser ${shown.name}.` : undefined,
+  );
+}
+
 export const setGhostVoteUsed = (game: Game, playerId: string, used: boolean): Game =>
   touch(updatePlayer(game, playerId, (p) => ({ ...p, ghostVoteUsed: used })));
 

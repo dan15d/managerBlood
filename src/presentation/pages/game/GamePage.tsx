@@ -224,6 +224,7 @@ export function GamePage() {
                   onChange={change}
                   onOpenPlayer={setSelected}
                   onEditBluffs={() => setEditingBluffs(true)}
+                  scriptCharacters={scriptCharacters}
                   onPickReminder={(sourceId, label) => {
                     setPick({ kind: "reminder", sourceId, label });
                     window.scrollTo({ top: 0, behavior: "smooth" });

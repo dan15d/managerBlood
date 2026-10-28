@@ -2,11 +2,14 @@ import type { Character } from "@domain/entities/Character";
 import { TEAM_LABEL } from "@domain/entities/Character";
 import type { Game, Player } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
+import { DECOYS } from "@domain/services/SetupRules";
+import { seatSecret } from "@domain/services/TableView";
 import { useState } from "react";
 import { CharacterPicker } from "../../components/CharacterPicker";
 import { Sheet } from "../../components/Sheet";
+import { ShowCard } from "../../components/ShowCard";
 import { Token } from "../../components/Token";
-import { ArrowLeft, HeartPulse, Skull, Smartphone, VenetianMask } from "lucide-react";
+import { ArrowLeft, Eye, HeartPulse, Skull, Smartphone, VenetianMask } from "lucide-react";
 
 const GENERIC_REMINDERS = ["Envenenado", "Borracho", "Protegido", "Muerto esta noche", "Sin habilidad", "Usado"];
 // Primero los recordatorios del Mal (Envenenado, Muerto…), que son los que más se ponen.
@@ -26,8 +29,15 @@ interface Props {
 export function PlayerSheet({ game, player, characters, scriptCharacters, newId, onChange, onClose }: Props) {
   const [changing, setChanging] = useState(false);
   const [custom, setCustom] = useState("");
+  const [card, setCard] = useState<{ heading: string; characters: Character[] } | null>(null);
+  // Lo que cree ser (el Borracho ve su personaje falso), para enseñárselo.
+  const secret = seatSecret(player, characters);
+  const believed = secret.characterId ? characters.get(secret.characterId) : undefined;
+  const bluffs = game.demonBluffs.map((id) => characters.get(id)).filter((c): c is Character => !!c);
   const character = characters.get(player.characterId);
   const shown = player.shownCharacterId ? characters.get(player.shownCharacterId) : undefined;
+  // Borracho, Lunático y Marioneta: qué tipo de personaje creen ser.
+  const decoyTeam = DECOYS[player.characterId];
 
   const inPlay = [...new Set(game.players.flatMap((p) => [p.characterId, p.shownCharacterId].filter(Boolean) as string[]))]
     .map((id) => characters.get(id))
@@ -85,6 +95,26 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
               <VenetianMask /> Cree ser <strong>{shown.name}</strong>. Despiértalo como tal y dale información falsa si te conviene.
             </div>
           )}
+          {decoyTeam && (
+            <label className="field" style={{ marginTop: 10 }}>
+              <span>Cree ser (es lo que ve en su móvil)</span>
+              <select
+                className="input"
+                value={player.shownCharacterId ?? ""}
+                onChange={(e) => onChange((g) => rules.setShownCharacter(g, player.id, characters.get(e.target.value)))}
+              >
+                <option value="">— Sin asignar: no verá ningún personaje —</option>
+                {scriptCharacters
+                  .filter((c) => c.team === decoyTeam)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {game.players.some((p) => p.characterId === c.id) ? " (en juego)" : ""}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
 
           <div className="row" style={{ marginTop: 12 }}>
             <button
@@ -111,6 +141,27 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
               {player.ghostVoteUsed ? "Voto fantasma gastado · devolver" : "Le queda el voto fantasma · gastar"}
             </button>
           )}
+
+          <div className="row" style={{ marginTop: 8 }}>
+            <button
+              className="btn btn--ghost"
+              style={{ flex: 1 }}
+              disabled={!believed}
+              onClick={() => believed && setCard({ heading: "Eres", characters: [believed] })}
+            >
+              <Eye /> Enseñarle su personaje
+            </button>
+            {character?.team === "demon" && (
+              <button
+                className="btn btn--ghost"
+                style={{ flex: 1 }}
+                disabled={!bluffs.length}
+                onClick={() => setCard({ heading: "Estos personajes no están en juego", characters: bluffs })}
+              >
+                <Eye /> Faroles
+              </button>
+            )}
+          </div>
 
           <div className="section-title">Recordatorios</div>
           {player.reminders.length ? (
@@ -214,6 +265,7 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
           </div>
         </>
       )}
+      {card && <ShowCard heading={card.heading} characters={card.characters} onClose={() => setCard(null)} />}
     </Sheet>
   );
 }

@@ -2,9 +2,13 @@ import type { Character } from "@domain/entities/Character";
 import type { Game } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import type { NightStep } from "@domain/services/NightOrder";
+import { useState } from "react";
+import { CharacterPicker } from "../../components/CharacterPicker";
+import { Sheet } from "../../components/Sheet";
+import { INFO_HEADINGS, ShowCard } from "../../components/ShowCard";
 import { Token } from "../../components/Token";
 import { NIGHT_ICONS } from "../../wikiAssets";
-import { ChevronLeft, ChevronRight, Skull, Sun, VenetianMask } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Skull, Sun, TriangleAlert, VenetianMask } from "lucide-react";
 
 interface Props {
   game: Game;
@@ -15,7 +19,17 @@ interface Props {
   onEditBluffs: () => void;
   /** Elegir un recordatorio y después tocar al jugador en el Grimorio. */
   onPickReminder: (sourceCharacterId: string, label: string) => void;
+  /** Personajes del guion, para enseñar cualquiera en una tarjeta. */
+  scriptCharacters: Character[];
 }
+
+interface Card {
+  heading?: string;
+  characters: Character[];
+}
+
+/** Recordatorios que dejan sin habilidad: hay que avisar al Narrador para que dé información falsa. */
+const DISABLING = /envenen|borrach|sin habilidad|loc[oa]|enloquec/i;
 
 /** Icono del paso: la ficha del personaje o el de la hoja de noche (crepúsculo, Esbirros…). */
 function StepIcon({ step, size }: { step: NightStep; size: number }) {
@@ -25,17 +39,28 @@ function StepIcon({ step, size }: { step: NightStep; size: number }) {
 }
 
 /** La hoja de noche: solo los personajes en juego, en orden, con lo que hay que hacer en cada paso. */
-export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, onEditBluffs, onPickReminder }: Props) {
+export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, onEditBluffs, onPickReminder, scriptCharacters }: Props) {
+  const [card, setCard] = useState<Card | null>(null);
+  const [choosing, setChoosing] = useState(false);
+  const [heading, setHeading] = useState<string | undefined>(undefined);
   const index = Math.min(game.nightStep, steps.length - 1);
   const step = steps[index];
   const player = (id: string) => game.players.find((p) => p.id === id)!;
   const last = index === steps.length - 1;
+  // Jugadores de este paso con un recordatorio que les quita la habilidad (envenenado, borracho…).
+  const disabled = step.playerIds.map(player).filter((p) => p.reminders.some((r) => DISABLING.test(r.label)));
 
   return (
     <div>
       <div className="night-card" aria-live="polite">
         <div className="night-card__head">
-          <StepIcon step={step} size={64} />
+          {step.character ? (
+            <button type="button" className="reveal__toggle" aria-label={`Enseñar ${step.title}`} onClick={() => setCard({ characters: [step.character!] })}>
+              <StepIcon step={step} size={64} />
+            </button>
+          ) : (
+            <StepIcon step={step} size={64} />
+          )}
           <div style={{ minWidth: 0 }}>
             <div className="small muted">
               Paso {index + 1} de {steps.length}
@@ -47,17 +72,35 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
         </div>
 
         {step.playerIds.length > 0 && (
-          <div className="wake-list">
+          <div className="wake-rows">
             {step.playerIds.map((id) => {
               const p = player(id);
               return (
-                <button key={id} className="chip" onClick={() => onOpenPlayer(id)}>
-                  {step.deceivedPlayerIds?.includes(id) && <VenetianMask />}
-                  {p.seat + 1}. {p.name}
-                  {!p.alive && <Skull />}
+                <button key={id} className="wake-row" onClick={() => onOpenPlayer(id)}>
+                  <span className="wake-row__name">
+                    {step.deceivedPlayerIds?.includes(id) && <VenetianMask />}
+                    {p.seat + 1}. {p.name}
+                    {!p.alive && <Skull />}
+                  </span>
+                  {(p.reminders.length > 0 || p.shownCharacterId) && (
+                    <span className="chips">
+                      {p.shownCharacterId && <span className="chip chip--static chip--reminder chip--tiny">Cree ser {characters.get(p.shownCharacterId)?.name}</span>}
+                      {p.reminders.map((r) => (
+                        <span key={r.id} className={`chip chip--static chip--reminder chip--tiny ${DISABLING.test(r.label) ? "chip--danger" : ""}`}>
+                          {r.label}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                 </button>
               );
             })}
+          </div>
+        )}
+        {disabled.length > 0 && (
+          <div className="alert alert--warning small">
+            <TriangleAlert /> {disabled.map((p) => `${p.name} (${p.reminders.filter((r) => DISABLING.test(r.label)).map((r) => r.label.toLowerCase()).join(", ")})`).join("; ")}
+            : sin habilidad esta noche. Despiértalo igual y dale información falsa si te conviene.
           </div>
         )}
         {step.kind === "character" && step.playerIds.length === 0 && <p className="muted small">Nadie en juego.</p>}
@@ -88,6 +131,11 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
         )}
 
         {step.kind === "minion_info" && (
+          <button className="btn btn--block" onClick={() => setCard({ heading: "Este es el Demonio", characters: [] })}>
+            <Eye /> Enseñar «Este es el Demonio»
+          </button>
+        )}
+        {step.kind === "minion_info" && (
           <p className="small">
             Demonio:{" "}
             <strong>
@@ -113,12 +161,35 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
               {game.demonBluffs.map((id) => (
                 <Token key={id} character={characters.get(id)} size={70} />
               ))}
-              <button className="btn btn--small" onClick={onEditBluffs}>
+            </div>
+            <div className="row" style={{ marginTop: 10 }}>
+              <button className="btn btn--primary" onClick={() => setCard({ heading: "Estos son tus Esbirros", characters: [] })}>
+                <Eye /> «Tus Esbirros»
+              </button>
+              <button
+                className="btn btn--primary"
+                disabled={!game.demonBluffs.length}
+                onClick={() =>
+                  setCard({
+                    heading: "Estos personajes no están en juego",
+                    characters: game.demonBluffs.map((id) => characters.get(id)).filter((c): c is Character => !!c),
+                  })
+                }
+              >
+                <Eye /> Enseñar faroles
+              </button>
+              <button className="btn btn--small btn--ghost" onClick={onEditBluffs}>
                 Cambiar faroles
               </button>
             </div>
           </>
         )}
+        {step.kind === "character" && (
+          <button className="btn btn--block btn--ghost" style={{ marginTop: 6 }} onClick={() => setChoosing(true)}>
+            <Eye /> Enseñar un personaje…
+          </button>
+        )}
+
         {step.kind === "dawn" && (
           <div className="stack" style={{ gap: 6 }}>
             <span className="small muted">¿Quién ha muerto esta noche? Toca para marcarlo:</span>
@@ -156,6 +227,36 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
           </li>
         ))}
       </ol>
+
+      {choosing && (
+        <Sheet onClose={() => setChoosing(false)} title="Enseñar un personaje" label="Enseñar un personaje">
+          <p className="muted small" style={{ marginTop: 0 }}>
+            Elige el encabezado (opcional) y toca el personaje para enseñarlo a pantalla completa.
+          </p>
+          <div className="heading-chips">
+            {INFO_HEADINGS.filter((h) => h !== "Estos son tus Esbirros").map((h) => (
+              <button key={h} className="chip" aria-pressed={heading === h} onClick={() => setHeading(heading === h ? undefined : h)}>
+                {h}
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <CharacterPicker
+              characters={scriptCharacters}
+              selected={[]}
+              searchable
+              onToggle={(id) => {
+                const c = characters.get(id);
+                if (!c) return;
+                setChoosing(false);
+                setCard({ heading, characters: [c] });
+              }}
+            />
+          </div>
+        </Sheet>
+      )}
+
+      {card && <ShowCard heading={card.heading} characters={card.characters} onClose={() => setCard(null)} />}
 
       <div className="action-bar">
         <button className="btn btn--ghost" style={{ flex: "0 0 auto" }} disabled={index === 0} onClick={() => onChange((g) => rules.setNightStep(g, index - 1))}>

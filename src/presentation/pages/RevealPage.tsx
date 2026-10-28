@@ -1,5 +1,6 @@
 import type { Game, Player } from "@domain/entities/Game";
 import { TEAM_LABEL } from "@domain/entities/Character";
+import { seatSecret } from "@domain/services/TableView";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
@@ -25,7 +26,8 @@ export function RevealPage() {
   if (!game) return <main className="page page--flow muted">Cargando…</main>;
 
   if (current) {
-    const character = app.catalog.get(current.shownCharacterId ?? current.characterId);
+    const secret = seatSecret(current, app.catalog.map());
+    const character = secret.characterId ? app.catalog.get(secret.characterId) : undefined;
     const done = () => {
       setSeen((s) => [...new Set([...s, current.id])]);
       setCurrent(null);
@@ -49,14 +51,15 @@ export function RevealPage() {
           ) : (
             <>
               <p className="muted">{current.name}, eres…</p>
-              <Token character={character} size={200} />
+              <Token character={character} alignment={secret.alignment} size={200} />
+              {!character && <p className="muted">El Narrador todavía no te ha asignado personaje.</p>}
               <h1 className={character ? `team-${character.team}` : undefined} style={{ margin: 0 }}>
                 {character?.name}
               </h1>
               {character && (
                 <span className={`badge team-${character.team}`}>
                   {character.team === "traveller"
-                    ? `Viajero · ${current.alignment === "good" ? "Bueno" : "Malvado"}`
+                    ? `Viajero · ${secret.alignment === "good" ? "Bueno" : "Malvado"}`
                     : TEAM_LABEL[character.team].singular}
                 </span>
               )}
