@@ -20,8 +20,14 @@ export function seatSecret(
   return { characterId: player.characterId, alignment: player.alignment };
 }
 
-export const publicPlayers = (game: Game): PublicPlayer[] =>
-  game.players.map((p) => ({ seat: p.seat, name: p.name, alive: p.alive, ghostVoteUsed: p.ghostVoteUsed }));
+export const publicPlayers = (game: Game, characters: Map<string, Character>): PublicPlayer[] =>
+  game.players.map((p) => ({
+    seat: p.seat,
+    name: p.name,
+    alive: p.alive,
+    ghostVoteUsed: p.ghostVoteUsed,
+    ...(characters.get(p.characterId)?.team === "traveller" ? { travellerId: p.characterId } : {}),
+  }));
 
 export const publicPhase = (game: Game) =>
   game.status === "finished" ? (game.winner === "good" ? "Ha ganado el Bien" : "Ha ganado el Mal") : phaseLabel(game.phase);

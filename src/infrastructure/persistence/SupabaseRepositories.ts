@@ -91,13 +91,14 @@ export class SupabaseScriptRepository implements CustomScriptRepository {
 
   async list(): Promise<Script[]> {
     await ownerId(this.client);
-    const { data, error } = await this.client.from("scripts").select("id, name, author, description, character_ids");
+    const { data, error } = await this.client.from("scripts").select("id, name, author, description, image, character_ids");
     fail("leer los guiones", error);
     return (data ?? []).map((r) => ({
       id: r.id,
       name: r.name,
       author: r.author ?? "",
       description: r.description ?? undefined,
+      image: r.image ?? undefined,
       characterIds: r.character_ids ?? [],
       official: false,
     }));
@@ -111,6 +112,7 @@ export class SupabaseScriptRepository implements CustomScriptRepository {
       name: script.name,
       author: script.author,
       description: script.description ?? null,
+      image: script.image ?? null,
       character_ids: script.characterIds,
       updated_at: new Date().toISOString(),
     });

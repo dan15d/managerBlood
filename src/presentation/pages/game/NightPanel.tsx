@@ -106,6 +106,13 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
         {step.kind === "character" && step.playerIds.length === 0 && <p className="muted small">Nadie en juego.</p>}
 
         <p style={{ margin: "8px 0" }}>{step.instruction}</p>
+        {/* La habilidad tal como está en la ficha, por si hay dudas (si no hay texto de noche, ya es la instrucción). */}
+        {step.character && step.character.ability !== step.instruction && (
+          <p className="ability night-card__ability">
+            <span className="small muted">Habilidad · </span>
+            {step.character.ability}
+          </p>
+        )}
 
         {step.character && step.character.reminders.length > 0 && (
           <div className="step-reminders">

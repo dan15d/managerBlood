@@ -1,10 +1,12 @@
 import type { ScriptSize } from "@application/use-cases/AiScriptUseCases";
 import type { Edition } from "@domain/entities/Character";
-import { FileJson, Sparkles, TriangleAlert } from "lucide-react";
+import { FileJson, ImagePlus, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { CharacterPicker } from "../components/CharacterPicker";
+import { EditionBanner } from "../components/EditionBanner";
+import { shrinkImage } from "../imageFile";
 import { Sheet } from "../components/Sheet";
 
 const EDITIONS: { id: Edition | "all"; label: string }[] = [
@@ -23,6 +25,7 @@ export function ScriptEditorPage() {
   const [name, setName] = useState("");
   const [author, setAuthor] = useState("");
   const [description, setDescription] = useState("");
+  const [image, setImage] = useState<string | undefined>(undefined);
   const [selected, setSelected] = useState<string[]>([]);
   const [edition, setEdition] = useState<Edition | "all">("all");
   const [importing, setImporting] = useState(false);
@@ -64,6 +67,7 @@ export function ScriptEditorPage() {
       setName(id ? s.name : `${s.name} (mi versión)`);
       setAuthor(id ? s.author : "");
       setDescription(s.description ?? "");
+      setImage(s.image);
       setSelected(s.characterIds);
     });
   }, [app, id, params]);
@@ -78,7 +82,7 @@ export function ScriptEditorPage() {
   const save = async () => {
     setSaving(true);
     try {
-      await app.saveScript.execute({ id, name, author, description, characterIds: selected });
+      await app.saveScript.execute({ id, name, author, description, image, characterIds: selected });
       toast("Guion guardado.");
       navigate("/guiones");
     } catch (e) {
@@ -94,6 +98,7 @@ export function ScriptEditorPage() {
       setSelected(parsed.characterIds);
       if (parsed.name) setName(parsed.name);
       if (parsed.author) setAuthor(parsed.author);
+      if (parsed.logo) setImage(parsed.logo);
       setImporting(false);
       toast(
         parsed.unknown.length
@@ -146,6 +151,40 @@ export function ScriptEditorPage() {
           <span>Descripción</span>
           <textarea className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" />
         </label>
+        <div className="field">
+          <span>Imagen</span>
+          {image && (
+            <div className="edition-card" style={{ overflow: "hidden", borderRadius: 12 }}>
+              <EditionBanner scriptId="" name={name || "Sin nombre"} image={image} />
+            </div>
+          )}
+          <div className="row">
+            <label className="btn btn--small">
+              <ImagePlus /> {image ? "Cambiar imagen" : "Subir imagen"}
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!file) return;
+                  try {
+                    setImage(await shrinkImage(file));
+                  } catch (err) {
+                    toast(errorMessage(err), "error");
+                  }
+                }}
+              />
+            </label>
+            {image && (
+              <button className="btn btn--small btn--ghost" onClick={() => setImage(undefined)}>
+                <Trash2 /> Quitar
+              </button>
+            )}
+          </div>
+          <small className="muted">Opcional: un logo o ilustración para reconocer el guion. Se reduce antes de guardarla.</small>
+        </div>
       </section>
 
       <div className="sticky-bar" style={{ marginTop: 16 }}>

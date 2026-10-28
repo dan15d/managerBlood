@@ -18,6 +18,8 @@ export interface PublicPlayer {
   name: string;
   alive: boolean;
   ghostVoteUsed: boolean;
+  /** Solo los Viajeros: su personaje es público y toda la mesa lo conoce. */
+  travellerId?: string;
 }
 
 export type TableStatus = "lobby" | "in_progress" | "finished";

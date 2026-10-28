@@ -6,6 +6,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { ScriptCharacterList } from "../components/ScriptCharacterList";
 import { Confirm } from "../components/Sheet";
+import { SeatCircle } from "../components/SeatCircle";
 import { Token } from "../components/Token";
 import { EyeOff, Flag, Moon, ScrollText, Sun, Users, VenetianMask } from "lucide-react";
 
@@ -31,6 +32,7 @@ export function PlayerPage() {
   useEffect(() => setRevealed(false), [characterId]);
 
   const character = characterId ? app.catalog.get(characterId) : undefined;
+  const alive = view?.players.filter((p) => p.alive).length ?? 0;
   const script = useMemo(
     () => (view?.characterIds ?? []).map((id) => app.catalog.get(id)).filter((c): c is Character => !!c),
     [app, view?.characterIds],
@@ -158,8 +160,52 @@ export function PlayerPage() {
             <p className="muted">La lista aparecerá cuando empiece la partida.</p>
           ) : (
             <>
+              <SeatCircle
+                items={view.players}
+                itemKey={(p) => String(p.seat)}
+                center={
+                  <>
+                    {view.phaseLabel && (
+                      <div className={`phase-pill phase-pill--${view.phaseLabel.startsWith("Noche") ? "night" : "day"}`}>
+                        {view.phaseLabel.startsWith("Noche") ? <Moon /> : <Sun />} {view.phaseLabel}
+                      </div>
+                    )}
+                    <div className="stat-row">
+                      <div className="stat">
+                        <span className="big-number">{alive}</span>
+                        <span>vivos</span>
+                      </div>
+                      <div className="stat">
+                        <span className="big-number">{Math.ceil(alive / 2)}</span>
+                        <span title="Votos necesarios para ejecutar">votos</span>
+                      </div>
+                    </div>
+                  </>
+                }
+                renderSeat={(p, size) => {
+                  const traveller = p.travellerId ? app.catalog.get(p.travellerId) : undefined;
+                  const me = p.seat === view.seat;
+                  return (
+                    <>
+                      <Token
+                        character={traveller}
+                        size={size}
+                        dead={!p.alive}
+                        hidden={!traveller}
+                        glow={me}
+                        label={`${p.name}${traveller ? `, ${traveller.name}` : ""}${p.alive ? "" : ", muerto"}${me ? " (tú)" : ""}`}
+                      />
+                      <span className="seat__name">
+                        {!p.alive && !p.ghostVoteUsed && <span title="Le queda el voto">● </span>}
+                        {p.name}
+                        {me && " (tú)"}
+                      </span>
+                    </>
+                  );
+                }}
+              />
               <p className="muted small">
-                {view.players.filter((p) => p.alive).length} vivos de {view.players.length}. En el orden de la mesa.
+                {alive} vivos de {view.players.length}. ● = muerto al que le queda el voto. Los Viajeros se ven porque son públicos.
               </p>
               <ul className="log">
                 {view.players.map((p) => (

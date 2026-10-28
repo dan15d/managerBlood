@@ -51,7 +51,7 @@ const normalize = (s: string) =>
 export class ParseScriptJson {
   constructor(private readonly catalog: CharacterCatalog) {}
 
-  execute(text: string): { name: string; author: string; characterIds: string[]; unknown: string[] } {
+  execute(text: string): { name: string; author: string; logo?: string; characterIds: string[]; unknown: string[] } {
     let data: unknown;
     try {
       data = JSON.parse(text);
@@ -67,6 +67,7 @@ export class ParseScriptJson {
     }
     let name = "";
     let author = "";
+    let logo: string | undefined;
     const characterIds: string[] = [];
     const unknown: string[] = [];
     for (const item of data) {
@@ -75,16 +76,26 @@ export class ParseScriptJson {
       if (raw === "_meta") {
         name = String((item as { name?: string }).name ?? "");
         author = String((item as { author?: string }).author ?? "");
+        const url = (item as { logo?: unknown }).logo;
+        if (typeof url === "string" && url.startsWith("https://")) logo = url;
         continue;
       }
       const id = index.get(normalize(raw));
       if (!id) unknown.push(raw);
       else if (!characterIds.includes(id)) characterIds.push(id);
     }
-    return { name, author, characterIds, unknown };
+    return { name, author, logo, characterIds, unknown };
   }
 }
 
 /** Exporta un guion en el formato de la herramienta oficial. */
 export const scriptToJson = (script: Script) =>
-  JSON.stringify([{ id: "_meta", name: script.name, author: script.author }, ...script.characterIds], null, 2);
+  JSON.stringify(
+    [
+      // El logo solo viaja si es una URL: una imagen subida no cabe en el JSON de la herramienta oficial.
+      { id: "_meta", name: script.name, author: script.author, ...(script.image?.startsWith("https://") ? { logo: script.image } : {}) },
+      ...script.characterIds,
+    ],
+    null,
+    2,
+  );

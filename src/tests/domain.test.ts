@@ -5,8 +5,8 @@ import * as rules from "@domain/services/GameRules";
 import { buildNightOrder } from "@domain/services/NightOrder";
 import { seededRandom } from "@domain/services/Random";
 import { pickBluffs, pickDecoys, randomSelection } from "@domain/services/SetupGenerator";
-import { seatSecret } from "@domain/services/TableView";
-import { allowedDistributions, baseDistribution, validateSelection } from "@domain/services/SetupRules";
+import { publicPlayers, seatSecret } from "@domain/services/TableView";
+import { allowedDistributions, baseDistribution, maxTravellers, travellerSeats, validateSelection } from "@domain/services/SetupRules";
 
 const catalog = new StaticCharacterCatalog();
 const scripts = new StaticOfficialScripts().list();
@@ -182,5 +182,28 @@ describe("lo que ve cada jugador", () => {
     expect(shown.team).toBe("townsfolk");
     expect(bag.some((c) => c.id === shown.id)).toBe(false);
     expect(seatSecret(seat("drunk", shown.id), map).characterId).toBe(shown.id);
+  });
+});
+
+describe("Viajeros", () => {
+  it("son opcionales, pero la bolsa nunca baja de 5", () => {
+    expect(maxTravellers(8)).toBe(3);
+    expect(maxTravellers(5)).toBe(0);
+  });
+
+  it("ocupan los últimos asientos salvo que el Narrador elija otro", () => {
+    expect(travellerSeats(8, ["thief", "beggar"])).toEqual({ 7: "thief", 6: "beggar" });
+    expect(travellerSeats(8, ["thief", "beggar"], { beggar: 0 })).toEqual({ 0: "beggar", 7: "thief" });
+  });
+
+  it("si dos eligen el mismo asiento, el segundo va a un asiento libre", () => {
+    expect(travellerSeats(6, ["thief", "beggar"], { thief: 2, beggar: 2 })).toEqual({ 2: "thief", 5: "beggar" });
+  });
+
+  it("la mesa pública enseña el personaje de los Viajeros y de nadie más", () => {
+    const g = game(["chef", "empath", "poisoner", "imp", "washerwoman", "thief"]);
+    const players = publicPlayers(g, catalog.map());
+    expect(players[5].travellerId).toBe("thief");
+    expect(players.slice(0, 5).every((p) => p.travellerId === undefined)).toBe(true);
   });
 });

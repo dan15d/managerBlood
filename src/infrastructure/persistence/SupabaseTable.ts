@@ -183,7 +183,7 @@ export class SupabaseTablePublisher implements TablePublisher {
       status: game.status,
       phase_label: publicPhase(game),
       winner: game.winner ?? null,
-      players: publicPlayers(game),
+      players: publicPlayers(game, characters),
     };
     const seats = game.players.map((p) => {
       const secret = seatSecret(p, characters);

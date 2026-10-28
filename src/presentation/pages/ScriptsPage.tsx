@@ -66,7 +66,7 @@ export function ScriptsPage() {
         {scripts.data?.map((s) => (
           <article key={s.id} className="card edition-card">
             <Link to={`/guiones/${s.id}/ver`} className="edition-card__link" aria-label={`Ver ${s.name}`}>
-              <EditionBanner scriptId={s.id} name={s.name} />
+              <EditionBanner scriptId={s.id} name={s.name} image={s.image} />
             </Link>
             <div className="edition-card__body stack" style={{ gap: 8 }}>
             <div className="row">

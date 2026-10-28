@@ -1,14 +1,16 @@
 import type { SetupStyle } from "@application/ports/AiStoryteller";
-import type { Character } from "@domain/entities/Character";
+import { TEAM_LABEL, type Character } from "@domain/entities/Character";
 import type { GameMode } from "@domain/entities/Game";
 import type { Script } from "@domain/entities/Script";
 import type { Lobby, Seat } from "@domain/entities/Table";
 import {
   baseDistribution,
   MAX_PLAYERS,
+  maxTravellers,
   MIN_PLAYERS,
   targetDistribution,
   travellerCount,
+  travellerSeats,
   validateSelection,
 } from "@domain/services/SetupRules";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -54,6 +56,8 @@ export function NewGamePage() {
   const [decoys, setDecoys] = useState<Record<string, string>>({});
   const [bluffs, setBluffs] = useState<string[]>([]);
   const [travellers, setTravellers] = useState<string[]>([]);
+  // Viajero → asiento que ha elegido el Narrador (si no, ocupan los últimos asientos).
+  const [chosenTravellerSeats, setChosenTravellerSeats] = useState<Record<string, number>>({});
   const [style, setStyle] = useState<SetupStyle>("equilibrada");
   const [extra, setExtra] = useState("");
   const [aiNotes, setAiNotes] = useState<{ explanation?: string; tips?: string[] } | null>(null);
@@ -116,12 +120,21 @@ export function NewGamePage() {
     const own = pool.filter((c) => c.team === "traveller");
     return own.length ? own : app.catalog.all().filter((c) => c.team === "traveller");
   }, [app, pool]);
-  const bagCount = playerCount - travellerCount(playerCount);
+  const forcedTravellers = travellerCount(playerCount);
+  const bagCount = playerCount - Math.max(travellers.length, forcedTravellers);
+  const travellerBySeat = travellerSeats(playerCount, travellers, chosenTravellerSeats);
+  const bagSeats = Array.from({ length: playerCount }, (_, seat) => seat).filter((seat) => !(seat in travellerBySeat));
+  const bagAssignment = Object.fromEntries(Object.entries(assignment).filter(([seat]) => bagSeats.includes(Number(seat))));
   const chosen = selected.map((id) => app.catalog.get(id)!).filter(Boolean);
   const issues = validateSelection(bagCount, chosen);
   const errors = issues.filter((i) => i.level === "error");
   const target = targetDistribution(bagCount, chosen);
   const playerNames = Array.from({ length: playerCount }, (_, i) => names[i]?.trim() || `Jugador ${i + 1}`);
+
+  // Si quedan menos jugadores, sobran Viajeros: la bolsa nunca baja de 5.
+  useEffect(() => {
+    if (travellers.length > maxTravellers(playerCount)) setTravellers((t) => t.slice(0, maxTravellers(playerCount)));
+  }, [playerCount, travellers.length]);
 
   // En el móvil, que el paso actual se vea en la tira de pasos.
   useEffect(() => {
@@ -202,8 +215,8 @@ export function NewGamePage() {
     !!mode,
     !!script,
     lobby ? seats.length >= MIN_PLAYERS : playerCount >= MIN_PLAYERS,
-    selected.length > 0 && errors.length === 0 && travellers.length === travellerCount(playerCount),
-    !manualSeats || Object.keys(assignment).length === bagCount,
+    selected.length > 0 && errors.length === 0 && travellers.length >= forcedTravellers,
+    !manualSeats || Object.keys(bagAssignment).length === bagCount,
   ][step];
 
   const create = async () => {
@@ -226,8 +239,8 @@ export function NewGamePage() {
         characterIds: selected,
         bluffIds: bluffs,
         decoys,
-        assignment: manualSeats ? assignment : undefined,
-        travellers: Object.fromEntries(travellers.map((id, i) => [bagCount + i, id])),
+        assignment: manualSeats ? bagAssignment : undefined,
+        travellers: travellerBySeat,
         aiNotes: notes,
         table: lobby ? { gameId: lobby.gameId, joinCode: lobby.joinCode, seats } : undefined,
       });
@@ -296,7 +309,7 @@ export function NewGamePage() {
                 disabled={openingLobby}
                 onClick={() => void chooseScript(s)}
               >
-                <EditionBanner scriptId={s.id} name={s.name} />
+                <EditionBanner scriptId={s.id} name={s.name} image={s.image} />
                 <div className="edition-card__body">
                   <p className="muted small" style={{ margin: 0 }}>
                     {s.description ? `${s.description.slice(0, 120)}${s.description.length > 120 ? "…" : ""}` : s.author || "Guion personalizado"}
@@ -401,6 +414,32 @@ export function NewGamePage() {
         <section>
           <h1>Personajes</h1>
 
+          <details className="card travellers-card" open={forcedTravellers > 0 || travellers.length > 0}>
+            <summary>
+              <span className="team-traveller">{TEAM_LABEL.traveller.plural}</span>
+              <span className="muted small">{forcedTravellers > 0 ? `al menos ${forcedTravellers}` : "opcional"}</span>
+              <span className="spacer" />
+              {travellers.length > 0 && <span className="counter">{travellers.length}</span>}
+            </summary>
+            <p className="muted small">
+              {forcedTravellers > 0
+                ? `Con más de 15 jugadores, al menos ${forcedTravellers} juegan como Viajeros. `
+                : "Para quien llega tarde o se va antes. "}
+              No salen de la bolsa: cada Viajero es un jugador menos en ella ({bagCount} en la bolsa). En el último paso eliges
+              quién es cada uno; su bando lo decides tú desde su ficha en el Grimorio.
+            </p>
+            <CharacterPicker
+              characters={travellerPool}
+              teams={["traveller"]}
+              selected={travellers}
+              onToggle={(id) =>
+                setTravellers((t) =>
+                  t.includes(id) ? t.filter((x) => x !== id) : t.length < maxTravellers(playerCount) ? [...t, id] : t,
+                )
+              }
+            />
+          </details>
+
           {mode === "ai" && !editingAi && (
             <div className="card stack" style={{ marginBottom: 16 }}>
               <h2 style={{ margin: 0 }}>¿Qué partida quieres?</h2>
@@ -488,24 +527,6 @@ export function NewGamePage() {
             </div>
           )}
 
-          {travellerCount(playerCount) > 0 && (
-            <div className="card stack" style={{ marginTop: 16 }}>
-              <h2 style={{ margin: 0 }}>Viajeros</h2>
-              <p className="muted small" style={{ margin: 0 }}>
-                Con más de 15 jugadores, {travellerCount(playerCount)} juegan como Viajeros (los últimos asientos). Elige cuáles.
-              </p>
-              <CharacterPicker
-                characters={travellerPool}
-                teams={["traveller"]}
-                selected={travellers}
-                onToggle={(id) =>
-                  setTravellers((t) =>
-                    t.includes(id) ? t.filter((x) => x !== id) : t.length < travellerCount(playerCount) ? [...t, id] : t,
-                  )
-                }
-              />
-            </div>
-          )}
         </section>
       )}
 
@@ -539,17 +560,43 @@ export function NewGamePage() {
               onClick={() => setManualSeats(true)}
             />
           </div>
+          {travellers.length > 0 && (
+            <div className="card stack">
+              <h2 style={{ margin: 0 }}>¿Quién es Viajero?</h2>
+              {travellers.map((id) => {
+                const seat = Number(Object.keys(travellerBySeat).find((s) => travellerBySeat[Number(s)] === id));
+                return (
+                  <label key={id} className="seat-input">
+                    <span className="team-traveller" style={{ flex: "0 0 40%", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {app.catalog.get(id)?.name}
+                    </span>
+                    <select
+                      className="input"
+                      value={seat}
+                      onChange={(e) => setChosenTravellerSeats({ ...chosenTravellerSeats, [id]: Number(e.target.value) })}
+                    >
+                      {playerNames.map((n, s) => (
+                        <option key={s} value={s} disabled={s in travellerBySeat && travellerBySeat[s] !== id}>
+                          {s + 1}. {n}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                );
+              })}
+            </div>
+          )}
           {manualSeats && (
             <div className="card stack">
-              {playerNames.slice(0, bagCount).map((n, seat) => (
+              {bagSeats.map((seat) => (
                 <label key={seat} className="seat-input">
                   <span className="seat-input__num">{seat + 1}</span>
-                  <span style={{ flex: "0 0 30%", overflow: "hidden", textOverflow: "ellipsis" }}>{n}</span>
+                  <span style={{ flex: "0 0 30%", overflow: "hidden", textOverflow: "ellipsis" }}>{playerNames[seat]}</span>
                   <select
                     className="input"
-                    value={assignment[seat] ?? ""}
+                    value={bagAssignment[seat] ?? ""}
                     onChange={(e) => {
-                      const copy = { ...assignment };
+                      const copy = { ...bagAssignment };
                       if (e.target.value) copy[seat] = e.target.value;
                       else delete copy[seat];
                       setAssignment(copy);
@@ -557,7 +604,7 @@ export function NewGamePage() {
                   >
                     <option value="">— Elige —</option>
                     {chosen
-                      .filter((c) => assignment[seat] === c.id || !Object.values(assignment).includes(c.id))
+                      .filter((c) => bagAssignment[seat] === c.id || !Object.values(bagAssignment).includes(c.id))
                       .map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}

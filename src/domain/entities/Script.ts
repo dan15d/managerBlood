@@ -6,6 +6,8 @@ export interface Script {
   characterIds: string[];
   official: boolean;
   description?: string;
+  /** Portada del guion personalizado: data URL ya reducida o URL de un logo. */
+  image?: string;
   /** Jugadores mínimos recomendados (BMR y S&V se recomiendan con 7 o más). */
   recommendedMinPlayers?: number;
 }

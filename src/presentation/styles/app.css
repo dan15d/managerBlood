@@ -1067,39 +1067,83 @@ button.token {
   border-color: rgb(224 36 47 / 0.6);
 }
 
-.seat__meta {
-  display: none;
-  gap: 3px;
-  flex-wrap: wrap;
-  justify-content: center;
-  max-width: 130px;
-}
-
-.reminder-dot {
-  font-size: 0.62rem;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--parchment);
-  color: var(--ink);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.reminder-count {
+/* Recordatorios: burbujas pequeñas con el icono de quien los pone, pegadas a la ficha. */
+.reminder-bubble {
+  --b: 24px;
+  --team: var(--line-strong);
   position: absolute;
-  top: 0;
-  right: 8px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--gold-bright);
+  translate: -50% -50%;
+  z-index: 2;
+  width: var(--b);
+  height: var(--b);
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--team);
+  background: radial-gradient(circle at 35% 30%, #fbf2dc, var(--parchment) 55%, #c9b48a 100%);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.55);
   color: var(--ink);
-  font-size: 0.7rem;
-  font-weight: 700;
+  font: 700 calc(var(--b) * 0.45) / 1 var(--font-ui);
   display: grid;
   place-items: center;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.reminder-bubble img {
+  width: 118%;
+  height: 118%;
+  object-fit: cover;
   pointer-events: none;
+}
+
+.reminder-bubble .lucide {
+  width: 62%;
+  height: 62%;
+}
+
+.reminder-bubble--shown {
+  background: var(--surface-3);
+  color: var(--gold-bright);
+  border-color: var(--gold);
+}
+
+.reminder-bubble:hover,
+.reminder-bubble[aria-pressed="true"] {
+  transform: scale(1.25);
+  z-index: 3;
+}
+
+.reminder-bubble[aria-pressed="true"] {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
+}
+
+.reminder-bubble--static {
+  --b: 44px;
+  position: static;
+  translate: none;
+  cursor: default;
+}
+
+.reminder-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgb(11 8 9 / 0.88);
+  border: 1px solid var(--gold);
+  box-shadow: var(--shadow);
+  animation: fade 0.15s;
+}
+
+.reminder-card__label {
+  font-family: var(--font-display);
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
 }
 
 .vote-token {
@@ -1663,6 +1707,23 @@ button.token {
   padding: 8px;
 }
 
+.edition-banner--image {
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.edition-banner--image h3 {
+  font-size: 1.15rem;
+  text-align: center;
+}
+
+.edition-banner--image .edition-banner__logo {
+  height: 120px;
+  border-radius: 8px;
+}
+
 .edition-banner__logo {
   width: auto;
   height: 140px;
@@ -1808,6 +1869,24 @@ button.token {
   min-height: 44px;
   display: flex;
   align-items: center;
+}
+
+.night-card__ability {
+  font-size: 0.88rem;
+}
+
+.travellers-card {
+  margin-bottom: 16px;
+}
+
+.travellers-card summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-family: var(--font-display);
+  font-weight: 700;
 }
 
 .action-bar--sheet {
@@ -2075,14 +2154,6 @@ button.token {
   .seat__name {
     font-size: 0.78rem;
     padding: 1px 9px;
-  }
-
-  .seat__meta {
-    display: flex;
-  }
-
-  .reminder-count {
-    display: none;
   }
 
   .big-number {

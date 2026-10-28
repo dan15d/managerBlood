@@ -100,7 +100,7 @@ export function ScriptViewPage() {
       </div>
 
       <div className="card edition-card" style={{ marginBottom: 16 }}>
-        <EditionBanner scriptId={script.id} name={script.name} />
+        <EditionBanner scriptId={script.id} name={script.name} image={script.image} />
         <div className="edition-card__body">
           <h1 style={{ margin: "0 0 4px" }}>{script.name}</h1>
           {script.author && <div className="muted small">{script.author}</div>}

@@ -35,6 +35,34 @@ export function baseDistribution(playerCount: number): Distribution {
 
 export const travellerCount = (playerCount: number) => Math.max(0, playerCount - MAX_BAG_PLAYERS);
 
+/** Los Viajeros son opcionales, pero en la bolsa siempre tiene que haber al menos 5 jugadores. */
+export const maxTravellers = (playerCount: number) => Math.max(0, playerCount - MIN_PLAYERS);
+
+/**
+ * Asiento de cada Viajero. Se respeta el que haya elegido el Narrador (si es válido y no está
+ * repetido); el resto ocupa los últimos asientos libres. Devuelve asiento → personaje.
+ */
+export function travellerSeats(playerCount: number, travellerIds: string[], chosen: Record<string, number> = {}): Record<number, string> {
+  const taken = new Set<number>();
+  const result: Record<number, string> = {};
+  for (const id of travellerIds) {
+    const seat = chosen[id];
+    if (seat !== undefined && seat >= 0 && seat < playerCount && !taken.has(seat)) {
+      taken.add(seat);
+      result[seat] = id;
+    }
+  }
+  let free = playerCount - 1;
+  for (const id of travellerIds) {
+    if (Object.values(result).includes(id)) continue;
+    while (taken.has(free)) free--;
+    if (free < 0) break;
+    taken.add(free);
+    result[free] = id;
+  }
+  return result;
+}
+
 /**
  * Personajes con corchetes en su ficha. Cada opción de `outsiders` es un ajuste válido
  * (el Padrino puede ser +1 o −1; el Globo, +0 o +1). `requires` añade personajes a la bolsa.

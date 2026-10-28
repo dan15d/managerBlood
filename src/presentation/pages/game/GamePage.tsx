@@ -12,7 +12,7 @@ import { DayPanel } from "./DayPanel";
 import { Grimoire } from "./Grimoire";
 import { NightPanel } from "./NightPanel";
 import { PlayerSheet } from "./PlayerSheet";
-import { ArrowLeft, Eye, EyeOff, Moon, ScrollText, Smartphone, Sparkles, Sun } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Eye, EyeOff, Moon, ScrollText, Smartphone, Sparkles, Sun } from "lucide-react";
 
 type Tab = "phase" | "ai" | "log";
 
@@ -20,7 +20,9 @@ type Tab = "phase" | "ai" | "log";
 type Pick =
   | { kind: "reminder"; sourceId: string; label: string }
   | { kind: "nominator" }
-  | { kind: "nominee"; nominatorId: string };
+  | { kind: "nominee"; nominatorId: string }
+  /** Cambiar sitios: se toca a uno y luego a otro, y se intercambian. Sigue activo hasta «Listo». */
+  | { kind: "seat"; fromId?: string };
 
 export function GamePage() {
   const { id } = useParams();
@@ -95,6 +97,14 @@ export function GamePage() {
 
   const tapPlayer = (pid: string) => {
     if (!pick) return setSelected(pid);
+    if (pick.kind === "seat") {
+      if (!pick.fromId) return setPick({ kind: "seat", fromId: pid });
+      if (pick.fromId !== pid) {
+        change((g) => rules.swapSeats(g, pick.fromId!, pid));
+        toast(`${name(pick.fromId)} y ${name(pid)} cambian de sitio.`);
+      }
+      return setPick({ kind: "seat" });
+    }
     if (pick.kind === "reminder") {
       change((g) => rules.addReminder(g, pid, { id: app.newId(), sourceCharacterId: pick.sourceId, label: pick.label }));
       toast(`«${pick.label}» en ${name(pid)}.`);
@@ -114,7 +124,11 @@ export function GamePage() {
 
   const pickText = !pick
     ? null
-    : pick.kind === "reminder"
+    : pick.kind === "seat"
+      ? pick.fromId
+        ? `¿Con quién cambia de sitio ${name(pick.fromId)}?`
+        : "Toca a un jugador y después a otro para cambiarlos de sitio"
+      : pick.kind === "reminder"
       ? `Toca al jugador para poner «${pick.label}»`
       : pick.kind === "nominator"
         ? "Toca a quien nomina"
@@ -125,7 +139,11 @@ export function GamePage() {
       ? game.players.filter((p) => p.alive && !game.nominations.some((n) => n.nominatorId === p.id)).map((p) => p.id)
       : pick?.kind === "nominee"
         ? game.players.filter((p) => !game.nominations.some((n) => n.nomineeId === p.id)).map((p) => p.id)
-        : (step?.playerIds ?? []);
+        : pick?.kind === "seat"
+          ? pick.fromId
+            ? [pick.fromId]
+            : game.players.map((p) => p.id)
+          : (step?.playerIds ?? []);
 
   return (
     <main className="page page--wide page--flow">
@@ -150,6 +168,16 @@ export function GamePage() {
         >
           {hidden ? <Eye /> : <EyeOff />}
           <span className="label-wide">{hidden ? " Mostrar" : " Ocultar"}</span>
+        </button>
+        <button
+          className="btn btn--small"
+          aria-pressed={pick?.kind === "seat"}
+          aria-label="Cambiar sitios"
+          onClick={() => setPick(pick?.kind === "seat" ? null : { kind: "seat" })}
+          title="Toca dos jugadores para cambiarlos de sitio"
+        >
+          <ArrowLeftRight />
+          <span className="label-wide"> Sitios</span>
         </button>
         <Link to={`/partida/${game.id}/revelar`} className="btn btn--small" aria-label="Repartir personajes">
           <Smartphone />
@@ -185,8 +213,8 @@ export function GamePage() {
       {pickText && (
         <div className="pick-banner" role="status">
           <span>{pickText}</span>
-          <button className="btn btn--small" onClick={() => setPick(null)}>
-            Cancelar
+          <button className={`btn btn--small ${pick?.kind === "seat" ? "btn--gold" : ""}`} onClick={() => setPick(null)}>
+            {pick?.kind === "seat" ? "Listo" : "Cancelar"}
           </button>
         </div>
       )}
@@ -200,6 +228,7 @@ export function GamePage() {
           picking={!!pick}
           centerNote={night && step ? `${Math.min(game.nightStep, steps.length - 1) + 1}/${steps.length} · ${step.title}` : undefined}
           onSelect={tapPlayer}
+          onRemoveReminder={(pid, rid) => change((g) => rules.removeReminder(g, pid, rid))}
         />
 
         <section className="card panel">
