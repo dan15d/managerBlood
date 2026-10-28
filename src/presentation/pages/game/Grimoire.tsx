@@ -59,6 +59,7 @@ export function Grimoire({ game, characters, highlighted, hidden, onSelect }: Pr
           <div key={p.id} className="seat" style={{ left: `${left}%`, top: `${top}%` }}>
             <Token
               character={character}
+              alignment={p.alignment}
               size={size}
               dead={!p.alive}
               hidden={hidden}

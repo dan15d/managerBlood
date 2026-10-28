@@ -88,4 +88,4 @@ Faltaría: pantalla «Unirse con código», que el Narrador publique los asiento
 
 ## Datos
 
-Los textos de los personajes son de la wiki de Villacuervos y el orden de noche del repositorio oficial `ThePandemoniumInstitute/botc-release`. Blood on the Clocktower es una marca de The Pandemonium Institute; este proyecto es una herramienta no oficial para uso personal.
+Los iconos de los personajes se cargan directamente desde la wiki de Villacuervos (no se copian al repositorio). Si no cargan, la ficha muestra sus iniciales. Los textos de los personajes son de la wiki de Villacuervos y el orden de noche del repositorio oficial `ThePandemoniumInstitute/botc-release`. Blood on the Clocktower es una marca de The Pandemonium Institute; este proyecto es una herramienta no oficial para uso personal.

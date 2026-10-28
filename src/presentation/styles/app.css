@@ -565,6 +565,27 @@ button.token {
   filter: brightness(0.62) saturate(1.4);
 }
 
+.token__img {
+  width: 86%;
+  height: 66%;
+  object-fit: contain;
+  margin-top: -4%;
+  filter: drop-shadow(0 1px 1px rgb(60 30 10 / 0.35));
+  pointer-events: none;
+}
+
+/* Fichas pequeñas (sin nombre): el icono ocupa casi toda la ficha. */
+.token__img--full {
+  width: 96%;
+  height: 96%;
+  margin: 0;
+}
+
+.token--icon .token__name {
+  margin-top: 0;
+  font-size: max(8px, calc(var(--size) * 0.105));
+}
+
 .token__name {
   font-family: var(--font-display);
   font-weight: 700;

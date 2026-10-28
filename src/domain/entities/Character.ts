@@ -31,6 +31,10 @@ export interface Character {
   reminders: string[];
   /** Cambia la preparación (texto entre corchetes de la ficha). */
   setup: boolean;
+  /** Icono con los colores de su bando. */
+  image?: string;
+  /** Icono con los colores del bando contrario (Aldeano que se vuelve malvado…). */
+  imageAlt?: string;
 }
 
 export const defaultAlignment = (team: Team): Alignment =>

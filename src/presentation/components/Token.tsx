@@ -1,15 +1,22 @@
-import type { Character } from "@domain/entities/Character";
-import type { CSSProperties } from "react";
+import type { Alignment, Character } from "@domain/entities/Character";
+import { defaultAlignment } from "@domain/entities/Character";
+import { useState, type CSSProperties } from "react";
 
-/** Iniciales para el centro de la ficha (no usamos las ilustraciones oficiales). */
+/** Iniciales para el centro de la ficha si el icono no carga. */
 const monogram = (name: string) => {
   const words = name.split(/\s+/).filter((w) => w.length > 2 || /^[A-ZÁÉÍÓÚÑ]/.test(w));
   const letters = (words.length > 1 ? words.slice(0, 2).map((w) => w[0]) : [name[0]]).join("");
   return letters.toUpperCase();
 };
 
+/** Icono de la wiki de Villacuervos; con el del bando contrario si el jugador ha cambiado de bando. */
+const iconFor = (character: Character, alignment?: Alignment) =>
+  alignment && alignment !== defaultAlignment(character.team) && character.imageAlt ? character.imageAlt : character.image;
+
 interface TokenProps {
   character?: Character;
+  /** Bando del jugador, para enseñar el icono en rojo o azul como las fichas físicas. */
+  alignment?: Alignment;
   size?: number;
   dead?: boolean;
   dim?: boolean;
@@ -20,17 +27,23 @@ interface TokenProps {
   label?: string;
 }
 
-export function Token({ character, size = 92, dead, dim, selected, hidden, glow, onClick, label }: TokenProps) {
+export function Token({ character, alignment, size = 92, dead, dim, selected, hidden, glow, onClick, label }: TokenProps) {
+  const [broken, setBroken] = useState<string | null>(null);
   const style = { "--size": `${size}px`, "--team": `var(--${character?.team ?? "line-strong"})` } as CSSProperties;
+  const icon = character && !hidden ? iconFor(character, alignment) : undefined;
+  const showIcon = !!icon && broken !== icon;
+  const showName = size >= 56;
   const className = [
     "token",
     dead && "token--dead",
     dim && "token--dim",
     selected && "token--selected",
     (hidden || !character) && "token--hidden",
+    showIcon && "token--icon",
   ]
     .filter(Boolean)
     .join(" ");
+
   const content = (
     <>
       {hidden || !character ? (
@@ -39,10 +52,22 @@ export function Token({ character, size = 92, dead, dim, selected, hidden, glow,
         </span>
       ) : (
         <>
-          <span className="token__mark" aria-hidden>
-            {monogram(character.name)}
-          </span>
-          {size >= 56 && <span className="token__name">{character.name}</span>}
+          {showIcon ? (
+            <img
+              className={`token__img ${showName ? "" : "token__img--full"}`}
+              src={icon}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              onError={() => setBroken(icon)}
+            />
+          ) : (
+            <span className="token__mark" aria-hidden>
+              {monogram(character.name)}
+            </span>
+          )}
+          {showName && <span className="token__name">{character.name}</span>}
         </>
       )}
       {dead && <span className="token__shroud" aria-hidden />}

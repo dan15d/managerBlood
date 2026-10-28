@@ -57,7 +57,7 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
   return (
     <Sheet onClose={onClose} label={`Jugador ${player.name}`}>
       <div className="sheet__head">
-        <Token character={character} size={84} dead={!player.alive} />
+        <Token character={character} alignment={player.alignment} size={84} dead={!player.alive} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <input
             className="input"
