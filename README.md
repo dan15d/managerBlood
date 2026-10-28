@@ -54,6 +54,8 @@ src/
 
 La clave *anon* es pública por diseño; los datos los protegen las políticas RLS (cada uno ve solo lo suyo).
 
+La sesión anónima es de cada navegador: las partidas no se ven desde otro dispositivo ni sobreviven a borrar los datos del navegador. Para eso hay que añadir inicio de sesión con cuenta (Supabase permite convertir la sesión anónima en una cuenta sin perder lo guardado).
+
 ## Modo IA (OpenRouter + DeepSeek)
 
 Recomendado, con Supabase: la clave vive en una Edge Function y nunca llega al navegador.

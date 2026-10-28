@@ -33,7 +33,8 @@ export function SettingsPage() {
         <h2>Dónde se guardan las partidas</h2>
         {app.storage === "supabase" ? (
           <div className="alert alert--ok">
-            En la nube (Supabase). Puedes abrir tus partidas desde otro dispositivo con este mismo navegador.
+            En la nube (Supabase), ligadas a la sesión de este navegador. Desde otro móvil, o si borras los datos del
+            navegador, no las verás: para eso hará falta iniciar sesión con una cuenta.
           </div>
         ) : (
           <div className="alert alert--info">
