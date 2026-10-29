@@ -13,7 +13,7 @@ import { FabledBar } from "./FabledBar";
 import { Grimoire } from "./Grimoire";
 import { NightPanel } from "./NightPanel";
 import { PlayerSheet } from "./PlayerSheet";
-import { ArrowLeft, ArrowLeftRight, Eye, EyeOff, Moon, ScrollText, Smartphone, Sparkles, Sun, Undo2 } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Eye, EyeOff, Flag, Moon, ScrollText, Smartphone, Sparkles, Sun, Undo2 } from "lucide-react";
 import { useWakeLock } from "../../hooks/useWakeLock";
 
 type Tab = "phase" | "ai" | "log";
@@ -30,7 +30,9 @@ type Pick =
   | { kind: "nominator" }
   | { kind: "nominee"; nominatorId: string }
   /** Cambiar sitios: se toca a uno y luego a otro, y se intercambian. Sigue activo hasta «Listo». */
-  | { kind: "seat"; fromId?: string };
+  | { kind: "seat"; fromId?: string }
+  /** Ejecutar sin votación (Virgen, Juez, Visir, locura…). */
+  | { kind: "execute" };
 
 export function GamePage() {
   const { id } = useParams();
@@ -44,6 +46,7 @@ export function GamePage() {
   const [editingBluffs, setEditingBluffs] = useState(false);
   const [dismissedHint, setDismissedHint] = useState("");
   const [pick, setPick] = useState<Pick | null>(null);
+  const [ending, setEnding] = useState(false);
   const characters = app.catalog.map();
   const saving = useRef(Promise.resolve());
   const gameRef = useRef<Game | null>(null);
@@ -153,6 +156,12 @@ export function GamePage() {
       if (message) toast(message);
       return setPick(null);
     }
+    if (pick.kind === "execute") {
+      change((g) => rules.executeNow(g, pid));
+      toast(`${name(pid)} es ejecutado.`);
+      setPick(null);
+      return setTab("phase");
+    }
     if (pick.kind === "nominator") {
       const problem = rules.canNominate(game, pid, "");
       if (problem) return toast(problem, "error");
@@ -160,7 +169,18 @@ export function GamePage() {
     }
     const problem = rules.canNominate(game, pick.nominatorId, pid);
     if (problem) return toast(problem, "error");
-    change((g) => rules.nominate(g, pick.nominatorId, pid, app.newId()));
+    // La Virgen: si la nomina un Aldeano por primera vez, ese Aldeano es ejecutado en el acto.
+    const nominatorId = pick.nominatorId;
+    let virgin = { executes: false, spy: false };
+    change((g) => {
+      const result = rules.virginNomination(rules.nominate(g, nominatorId, pid, app.newId()), nominatorId, pid, characters);
+      virgin = result;
+      return result.executes
+        ? rules.executeNow(result.game, nominatorId, `${name(nominatorId)} nomina a la Virgen siendo Aldeano: es ejecutado en el acto.`)
+        : result.game;
+    });
+    if (virgin.executes) toast(`${name(pid)} es la Virgen y ${name(nominatorId)} es Aldeano: ${name(nominatorId)} es ejecutado en el acto.`);
+    else if (virgin.spy) toast(`${name(pid)} es la Virgen y la nomina el Espía: si decides que se registra como Aldeano, usa «Ejecutar sin votación».`);
     setPick(null);
     setTab("phase");
   };
@@ -173,6 +193,8 @@ export function GamePage() {
         : "Toca a un jugador y después a otro para cambiarlos de sitio"
       : pick.kind === "reminder"
       ? `Toca al jugador para poner «${pick.label}»`
+      : pick.kind === "execute"
+        ? "Toca al jugador que se ejecuta sin votación"
       : pick.kind === "nominator"
         ? "Toca a quien nomina"
         : `${name(pick.nominatorId)} nomina a… toca al nominado`;
@@ -186,7 +208,9 @@ export function GamePage() {
           ? pick.fromId
             ? [pick.fromId]
             : game.players.map((p) => p.id)
-          : (step?.playerIds ?? []);
+          : pick?.kind === "execute"
+            ? game.players.map((p) => p.id)
+            : (step?.playerIds ?? []);
 
   return (
     <main className="page page--wide page--flow">
@@ -230,7 +254,42 @@ export function GamePage() {
           <Smartphone />
           <span className="label-wide"> Repartir</span>
         </Link>
+        {game.status !== "finished" && (
+          <button className="btn btn--small" aria-label="Terminar la partida" title="Declarar quién gana" onClick={() => setEnding(true)}>
+            <Flag />
+            <span className="label-wide"> Terminar</span>
+          </button>
+        )}
       </div>
+
+      {ending && (
+        <Sheet onClose={() => setEnding(false)} title="Terminar la partida" label="Terminar la partida">
+          <p className="muted small" style={{ marginTop: 0 }}>
+            Para las victorias que la app no detecta sola: el Patoso, la Damisela, el Goblin, la Gemela malvada, el Hereje… Se puede
+            reabrir si te equivocas.
+          </p>
+          <div className="action-bar action-bar--sheet">
+            <button
+              className="btn"
+              onClick={() => {
+                setEnding(false);
+                change((g) => rules.declareWinner(g, "evil"));
+              }}
+            >
+              Gana el Mal
+            </button>
+            <button
+              className="btn btn--gold"
+              onClick={() => {
+                setEnding(false);
+                change((g) => rules.declareWinner(g, "good"));
+              }}
+            >
+              Gana el Bien
+            </button>
+          </div>
+        </Sheet>
+      )}
 
       {game.status === "finished" ? (
         <div className={`banner banner--${game.winner}`}>
@@ -273,7 +332,7 @@ export function GamePage() {
           <div className={`banner banner--${hint.winner}`}>
             <div style={{ flex: 1, minWidth: 200 }}>
               <h2>{hint.winner === "good" ? "¿Gana el Bien?" : "¿Gana el Mal?"}</h2>
-              <div className="small muted">{hint.reason} Recuerda el Alcalde, el Santo…</div>
+              <div className="small muted">{hint.reason}</div>
             </div>
             <button className="btn btn--small btn--gold" onClick={() => change((g) => rules.declareWinner(g, hint.winner))}>
               Declarar victoria
@@ -353,6 +412,10 @@ export function GamePage() {
                   onChange={change}
                   onStartNomination={() => {
                     setPick({ kind: "nominator" });
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  onStartExecution={() => {
+                    setPick({ kind: "execute" });
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                 />

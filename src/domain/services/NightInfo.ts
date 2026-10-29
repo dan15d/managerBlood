@@ -55,6 +55,8 @@ export const CHOICE_REMINDER: Record<string, string> = {
   lilmonsta: "Es el Demonio",
   yaggababble: "Muerto",
   alhadikhia: "1",
+  bureaucrat: "3 votos",
+  thief: "Voto negativo",
 };
 
 /** Lo que pone quien elige esta noche: el Lleech, la primera noche, envenena a su huésped. */

@@ -1505,6 +1505,15 @@ button.token {
   color: var(--text-strong);
 }
 
+/* Voto que no vale 1 (Burócrata ×3, Ladrón −1). */
+.vote-weight {
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--fabled);
+}
+
 .vote-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;

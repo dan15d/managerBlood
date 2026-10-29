@@ -177,8 +177,10 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
           </details>
         )}
 
-        {step.dead && (
-          <div className="alert alert--warning small">Está muerto: sáltalo, salvo que su habilidad diga que actúa al morir.</div>
+        {step.deathNote ? (
+          <div className={`alert ${step.deathNote.wake ? "alert--info" : "alert--warning"} small`}>{step.deathNote.text}</div>
+        ) : (
+          step.dead && <div className="alert alert--warning small">Está muerto: sáltalo, salvo que su habilidad diga que actúa al morir.</div>
         )}
         {!!step.deceivedPlayerIds?.length && (
           <div className="alert alert--warning small">

@@ -189,6 +189,8 @@ export const DUSK_REMINDERS = new Set([
   "organgrinder:A punto de morir",
   "custom:Protegido",
   "custom:Muerto esta noche",
+  "bureaucrat:3 votos",
+  "thief:Voto negativo",
 ]);
 
 /**
@@ -289,6 +291,21 @@ export function canVote(player: Player) {
   return player.alive || !player.ghostVoteUsed;
 }
 
+/**
+ * Cuánto vale el voto de un jugador hoy: el elegido anoche por el Burócrata vota ×3 y el
+ * elegido por el Ladrón vota en negativo.
+ */
+export function voteWeight(player: Player): number {
+  const has = (source: string, label: string) => player.reminders.some((r) => r.sourceCharacterId === source && r.label === label);
+  if (has("thief", "Voto negativo")) return -1;
+  if (has("bureaucrat", "3 votos")) return 3;
+  return 1;
+}
+
+/** Votos de una nominación, con el peso de cada voto (Burócrata, Ladrón). */
+export const voteCount = (game: Game, nomination: Nomination) =>
+  nomination.voterIds.reduce((sum, id) => sum + (findPlayer(game, id) ? voteWeight(findPlayer(game, id)!) : 1), 0);
+
 export function toggleVote(game: Game, nominationId: string, voterId: string): Game {
   const nomination = game.nominations.find((n) => n.id === nominationId);
   if (!nomination || nomination.closed) throw new RuleViolation("Esa votación ya está cerrada.");
@@ -314,7 +331,7 @@ export function closeNomination(game: Game, nominationId: string): Game {
       players,
       nominations: game.nominations.map((n) => (n.id === nominationId ? { ...n, closed: true } : n)),
     },
-    `${nominee.name} recibe ${nomination.voterIds.length} votos.`,
+    `${nominee.name} recibe ${voteCount(game, nomination)} votos.`,
   );
 }
 
@@ -328,7 +345,7 @@ export function onTheBlock(game: Game): { playerId: string; votes: number } | nu
   let best: { playerId: string; votes: number } | null = null;
   let tied = false;
   for (const n of closed) {
-    const votes = n.voterIds.length;
+    const votes = voteCount(game, n);
     if (votes < threshold) continue;
     if (!best || votes > best.votes) {
       best = { playerId: n.nomineeId, votes };
@@ -352,6 +369,40 @@ export function execute(game: Game, playerId: string): Game {
   const leviathan = after.players.some((p) => p.characterId === "leviathan" && reallyAlive(p));
   if (leviathan && player.alignment === "good") after = withReminder(after, playerId, "leviathan", LEVIATHAN_GOOD_EXECUTED);
   return { ...after, executedToday: playerId };
+}
+
+/**
+ * Ejecución que no sale de una votación (la Virgen, el Juez, el Visir, la locura del
+ * Cerenovus…). Si había una votación abierta, se cierra.
+ */
+export function executeNow(game: Game, playerId: string, reason?: string): Game {
+  const open = game.nominations.find((n) => !n.closed);
+  const closed = open ? { ...game, nominations: game.nominations.map((n) => (n.id === open.id ? { ...n, closed: true } : n)) } : game;
+  return execute(reason ? touch(closed, reason) : closed, playerId);
+}
+
+const VIRGIN_USED = "Sin habilidad";
+
+/**
+ * La Virgen nominada por primera vez: pierde su habilidad y, si quien nomina es un Aldeano
+ * (y la Virgen está sana), ese Aldeano es ejecutado en el acto. Devuelve si hay que ejecutar.
+ * El Espía puede registrarse como Aldeano: eso lo decide el Narrador.
+ */
+export function virginNomination(
+  game: Game,
+  nominatorId: string,
+  nomineeId: string,
+  characters: Map<string, Character>,
+): { game: Game; executes: boolean; spy: boolean } {
+  const virgin = findPlayer(game, nomineeId);
+  const nominator = findPlayer(game, nominatorId);
+  if (!virgin || !nominator || virgin.characterId !== "virgin" || virgin.reminders.some((r) => r.sourceCharacterId === "virgin" && r.label === VIRGIN_USED)) {
+    return { game, executes: false, spy: false };
+  }
+  const used = withReminder(game, nomineeId, "virgin", VIRGIN_USED);
+  const healthy = !virgin.reminders.some((r) => DISABLED_REMINDER.test(r.label));
+  const townsfolk = characters.get(nominator.characterId)?.team === "townsfolk";
+  return { game: used, executes: healthy && townsfolk, spy: healthy && nominator.characterId === "spy" };
 }
 
 // ---------- Fin de partida ----------
@@ -574,6 +625,11 @@ export function succeedDemon(game: Game, succession: DemonSuccession, heirId: st
  */
 export function victoryHint(game: Game, characters: Map<string, Character>): VictoryHint | null {
   if (game.status === "finished") return null;
+  // El Santo ejecutado hoy (y sano): su equipo pierde.
+  const executed = game.executedToday ? findPlayer(game, game.executedToday) : undefined;
+  if (executed?.characterId === "saint" && !executed.alive && !executed.reminders.some((r) => DISABLED_REMINDER.test(r.label))) {
+    return { winner: executed.alignment === "good" ? "evil" : "good", reason: "Han ejecutado al Santo." };
+  }
   const demons = demonPlayers(game, characters);
   if (demons.length && !demons.some(reallyAlive)) {
     if (demonSuccession(game, characters)) return null;
@@ -590,12 +646,18 @@ export function victoryHint(game: Game, characters: Map<string, Character>): Vic
 /**
  * Victorias que se deciden al terminar el día:
  * - Vortox vivo y nadie ejecutado hoy: gana el Mal.
+ * - Alcalde vivo y sano, 3 jugadores vivos y nadie ejecutado hoy: gana su equipo.
  * - Leviatán vivo al terminar el día 5 (o más): gana el Mal.
  */
-export function duskVictory(game: Game): VictoryHint | null {
+export function duskVictory(game: Game, characters: Map<string, Character>): VictoryHint | null {
   if (game.status === "finished" || game.phase.kind !== "day") return null;
   const alive = (id: string) => game.players.some((p) => p.characterId === id && reallyAlive(p));
   if (alive("vortox") && !game.executedToday) return { winner: "evil", reason: "Con Vortox vivo, un día sin ejecución hace ganar al Mal." };
+  const mayor = game.players.find((p) => p.characterId === "mayor" && p.alive && !p.reminders.some((r) => DISABLED_REMINDER.test(r.label)));
+  const aliveCount = game.players.filter((p) => reallyAlive(p) && characters.get(p.characterId)?.team !== "traveller").length;
+  if (mayor && aliveCount === 3 && !game.executedToday) {
+    return { winner: mayor.alignment, reason: "Quedan 3 jugadores vivos, no ha habido ejecución y el Alcalde sigue vivo." };
+  }
   if (alive("leviathan") && game.phase.number >= 5) return { winner: "evil", reason: `Termina el día ${game.phase.number} y Leviatán sigue vivo.` };
   return null;
 }

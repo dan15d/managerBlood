@@ -11,18 +11,21 @@ interface Props {
   onChange: (mutate: (g: Game) => Game) => void;
   /** Nominar tocando en el Grimorio: primero quién nomina y después a quién. */
   onStartNomination: () => void;
+  /** Ejecutar sin votación tocando al jugador en el Grimorio (Virgen, Juez, Visir…). */
+  onStartExecution: () => void;
 }
 
 /** Nominaciones, votos y ejecución. El orden de voto empieza a la izquierda del nominado. */
-export function DayPanel({ game, characters, onChange, onStartNomination }: Props) {
+export function DayPanel({ game, characters, onChange, onStartNomination, onStartExecution }: Props) {
   const [confirmDusk, setConfirmDusk] = useState(false);
   /** Recordatorios marcados para quitar al anochecer (null: la hoja está cerrada). */
   const [cleaning, setCleaning] = useState<string[] | null>(null);
-  /** Motivo por el que el Mal gana al anochecer (null: no hay). */
-  const [duskWin, setDuskWin] = useState<string | null>(null);
+  /** Victoria que se decide al anochecer (Vortox, Alcalde, Leviatán…). */
+  const [duskWin, setDuskWin] = useState<rules.VictoryHint | null>(null);
   const name = (id: string) => game.players.find((p) => p.id === id)?.name ?? "?";
   const threshold = rules.voteThreshold(game);
   const open = game.nominations.find((n) => !n.closed);
+  const votes = open ? rules.voteCount(game, open) : 0;
   const block = rules.onTheBlock(game);
 
   const voteOrder = (nomineeId: string) => {
@@ -40,10 +43,10 @@ export function DayPanel({ game, characters, onChange, onStartNomination }: Prop
     }
     onChange(rules.startNight);
   };
-  // Victorias que se deciden al acabar el día (Vortox sin ejecución, Leviatán tras el día 5).
+  // Victorias que se deciden al acabar el día (Vortox o Alcalde sin ejecución, Leviatán tras el día 5).
   const checkDuskVictory = () => {
-    const win = rules.duskVictory(game);
-    if (win) setDuskWin(win.reason);
+    const win = rules.duskVictory(game, characters);
+    if (win) setDuskWin(win);
     else goToNight();
   };
   const endDay = () => {
@@ -69,6 +72,8 @@ export function DayPanel({ game, characters, onChange, onStartNomination }: Prop
           <div className="vote-list">
             {voteOrder(open.nomineeId).map((p) => {
               const on = open.voterIds.includes(p.id);
+              // Burócrata (×3) y Ladrón (−1): su voto no vale 1.
+              const weight = rules.voteWeight(p);
               return (
                 <button
                   key={p.id}
@@ -81,16 +86,17 @@ export function DayPanel({ game, characters, onChange, onStartNomination }: Prop
                     {on ? <Hand /> : p.alive ? null : <Ghost />}
                   </span>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                  {weight !== 1 && <span className="vote-weight">{weight > 0 ? `×${weight}` : "−1"}</span>}
                 </button>
               );
             })}
           </div>
           <div className="row" style={{ margin: "12px 0 6px" }}>
-            <span className="big-number">{open.voterIds.length}</span>
+            <span className="big-number">{votes}</span>
             <span className="muted">/ {threshold} necesarios</span>
           </div>
           <div className="meter">
-            <div style={{ width: `${Math.min(100, (open.voterIds.length / Math.max(threshold, 1)) * 100)}%` }} />
+            <div style={{ width: `${Math.max(0, Math.min(100, (votes / Math.max(threshold, 1)) * 100))}%` }} />
           </div>
           <button className="btn btn--primary btn--block" style={{ marginTop: 12 }} onClick={() => onChange((g) => rules.closeNomination(g, open.id))}>
             Cerrar votación
@@ -104,6 +110,9 @@ export function DayPanel({ game, characters, onChange, onStartNomination }: Prop
           <p className="muted small" style={{ margin: 0, textAlign: "center" }}>
             Después toca en el Grimorio a quien nomina y a quien es nominado.
           </p>
+          <button className="btn btn--small btn--ghost" style={{ alignSelf: "center" }} onClick={onStartExecution}>
+            Ejecutar sin votación…
+          </button>
         </div>
       )}
 
@@ -118,7 +127,7 @@ export function DayPanel({ game, characters, onChange, onStartNomination }: Prop
                   <span style={{ flex: 1 }}>
                     {name(n.nomineeId)} <span className="muted small">(por {name(n.nominatorId)})</span>
                   </span>
-                  <strong className={n.voterIds.length >= threshold ? "team-fabled" : "muted"}>{n.voterIds.length} votos</strong>
+                  <strong className={rules.voteCount(game, n) >= threshold ? "team-fabled" : "muted"}>{rules.voteCount(game, n)} votos</strong>
                 </li>
               ))}
           </ul>
@@ -163,8 +172,8 @@ export function DayPanel({ game, characters, onChange, onStartNomination }: Prop
         />
       )}
       {duskWin && (
-        <Sheet onClose={() => setDuskWin(null)} title="¿Gana el Mal?" label="Victoria del Mal al anochecer">
-          <p style={{ marginTop: 0 }}>{duskWin}</p>
+        <Sheet onClose={() => setDuskWin(null)} title={duskWin.winner === "good" ? "¿Gana el Bien?" : "¿Gana el Mal?"} label="Victoria al anochecer">
+          <p style={{ marginTop: 0 }}>{duskWin.reason}</p>
           <p className="muted small">
             Si su habilidad no funciona hoy (está borracho o envenenado), la partida sigue.
           </p>
@@ -181,11 +190,12 @@ export function DayPanel({ game, characters, onChange, onStartNomination }: Prop
             <button
               className="btn btn--gold"
               onClick={() => {
+                const winner = duskWin.winner;
                 setDuskWin(null);
-                onChange((g) => rules.declareWinner(g, "evil"));
+                onChange((g) => rules.declareWinner(g, winner));
               }}
             >
-              Gana el Mal
+              {duskWin.winner === "good" ? "Gana el Bien" : "Gana el Mal"}
             </button>
           </div>
         </Sheet>

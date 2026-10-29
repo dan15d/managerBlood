@@ -165,14 +165,14 @@ describe("Lil' Monsta", () => {
 describe("Vortox y Leviatán", () => {
   it("con Vortox, un día sin ejecución gana el Mal", () => {
     const g = day(game(["vortox", "poisoner", "chef", "empath", "monk"]), 2);
-    expect(rules.duskVictory(g)?.winner).toBe("evil");
-    expect(rules.duskVictory(rules.execute(g, "p2"))).toBeNull();
+    expect(rules.duskVictory(g, map)?.winner).toBe("evil");
+    expect(rules.duskVictory(rules.execute(g, "p2"), map)).toBeNull();
   });
 
   it("Leviatán gana al terminar el día 5 o con el segundo bueno ejecutado", () => {
     const ids = ["leviathan", "poisoner", "chef", "empath", "monk", "soldier", "washerwoman"];
-    expect(rules.duskVictory(day(game(ids), 4))).toBeNull();
-    expect(rules.duskVictory(day(game(ids), 5))?.winner).toBe("evil");
+    expect(rules.duskVictory(day(game(ids), 4), map)).toBeNull();
+    expect(rules.duskVictory(day(game(ids), 5), map)?.winner).toBe("evil");
     let g = rules.execute(day(game(ids), 1), "p2");
     expect(rules.victoryHint(g, map)).toBeNull();
     g = rules.execute(day(g, 2), "p3");

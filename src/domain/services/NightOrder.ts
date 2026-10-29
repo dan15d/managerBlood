@@ -17,6 +17,29 @@ export interface NightStep {
   deceivedPlayerIds?: string[];
   /** El jugador está muerto: normalmente se salta, salvo habilidades que actúan al morir. */
   dead?: boolean;
+  /** Para los que actúan al morir: si toca despertarlo esta noche o no, y por qué. */
+  deathNote?: { wake: boolean; text: string };
+}
+
+/** Actúan si han muerto esta noche (Guardián de cuervos, Sabio, Granjero, Banshee). */
+const ACT_IF_DIED_TONIGHT = new Set(["ravenkeeper", "sage", "farmer", "banshee"]);
+/** Actúan una vez si han muerto hoy o esta noche (Adorable, Barbero, Doctor de plaga). */
+const ACT_IF_DIED_RECENTLY = new Set(["sweetheart", "barber", "plaguedoctor"]);
+
+function deathNote(game: Game, characterId: string, players: Player[]): NightStep["deathNote"] {
+  const tonight = players.some((p) => (game.nightDeaths ?? []).includes(p.id));
+  if (ACT_IF_DIED_TONIGHT.has(characterId)) {
+    return tonight
+      ? { wake: true, text: "Ha muerto esta noche: despiértalo para que use su habilidad." }
+      : { wake: false, text: "Solo actúa si muere esta noche. Ahora no le despiertes." };
+  }
+  if (ACT_IF_DIED_RECENTLY.has(characterId)) {
+    const recently = tonight || players.some((p) => (game.dayDeaths ?? []).includes(p.id));
+    return recently
+      ? { wake: true, text: "Ha muerto hoy o esta noche: su habilidad se activa ahora (si no lo has hecho ya)." }
+      : { wake: false, text: "Solo actúa cuando muere. Ahora no hay nada que hacer." };
+  }
+  return undefined;
 }
 
 /**
@@ -96,6 +119,7 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
     const order = first ? c.firstNight : c.otherNight;
     if (!order) continue;
     const deceived = players.filter((p) => p.shownCharacterId === id).map((p) => p.id);
+    const note = players.length ? deathNote(game, id, players) : undefined;
     steps.push({
       order,
       step: {
@@ -106,7 +130,9 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
         playerIds: players.map((p) => p.id),
         deceivedPlayerIds: deceived,
         character: c,
-        dead: players.length > 0 && players.every((p) => !reallyAlive(p)),
+        // Los que actúan al morir se saltan si no les toca, aunque estén vivos.
+        dead: note ? !note.wake : players.length > 0 && players.every((p) => !reallyAlive(p)),
+        deathNote: note,
       },
     });
   }
