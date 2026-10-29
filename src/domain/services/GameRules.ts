@@ -282,14 +282,75 @@ export interface VictoryHint {
   reason: string;
 }
 
+/** Quién pasa a ser el Demonio cuando muere: la Mujer escarlata o un Esbirro (pase del Diablillo). */
+export interface DemonSuccession {
+  /** El Demonio que ha muerto: el heredero pasa a ser ese mismo personaje. */
+  demon: Player;
+  /** Uno solo si es obligatorio (la Mujer escarlata); varios si el Narrador elige. */
+  heirs: Player[];
+  reason: string;
+  /** Algo que puede impedirlo (la Mujer escarlata está envenenada o borracha). */
+  caveat?: string;
+}
+
+const DISABLED_REMINDER = /envenen|borrach|sin habilidad/i;
+
+/**
+ * Si el Demonio ha muerto pero la partida sigue porque otro jugador pasa a serlo:
+ * - Mujer escarlata viva y 5 o más jugadores vivos justo antes de morir el Demonio (4 o más
+ *   después; los Viajeros no cuentan): se convierte en ese Demonio, de día o de noche.
+ * - Si no, el Diablillo muerto de noche (se ha matado a sí mismo): un Esbirro vivo, a elegir.
+ */
+export function demonSuccession(game: Game, characters: Map<string, Character>): DemonSuccession | null {
+  if (game.status === "finished") return null;
+  const team = (p: Player) => characters.get(p.characterId)?.team;
+  const demons = game.players.filter((p) => team(p) === "demon");
+  if (!demons.length || demons.some((d) => d.alive)) return null;
+  const demon = demons[0];
+  const demonName = characters.get(demon.characterId)?.name ?? "el Demonio";
+  const aliveAfter = alivePlayers(game).filter((p) => team(p) !== "traveller").length;
+
+  const scarlet = game.players.find((p) => p.characterId === "scarletwoman" && p.alive);
+  if (scarlet && aliveAfter >= 4) {
+    const disabled = scarlet.reminders.find((r) => DISABLED_REMINDER.test(r.label));
+    return {
+      demon,
+      heirs: [scarlet],
+      reason: `Ha muerto el Demonio (${demonName}) con ${aliveAfter + 1} jugadores vivos: la Mujer escarlata se convierte en el nuevo Demonio y la partida sigue.`,
+      caveat: disabled ? `La Mujer escarlata tiene «${disabled.label}»: si de verdad no tiene habilidad, ganan los buenos.` : undefined,
+    };
+  }
+
+  if (demon.characterId === "imp" && game.phase.kind === "night") {
+    const minions = game.players.filter((p) => p.alive && team(p) === "minion");
+    if (minions.length) {
+      return {
+        demon,
+        heirs: minions,
+        reason: `Si el Demonio (${demonName}) se ha matado a sí mismo esta noche, elige un Esbirro vivo: se convierte en el nuevo Demonio. Si ha muerto por otra cosa, ganan los buenos.`,
+      };
+    }
+  }
+  return null;
+}
+
+/** El heredero pasa a ser el Demonio que ha muerto (con su habilidad y su bando). */
+export function succeedDemon(game: Game, succession: DemonSuccession, heirId: string, characters: Map<string, Character>): Game {
+  if (!succession.heirs.some((h) => h.id === heirId)) throw new RuleViolation("Ese jugador no puede pasar a ser el Demonio.");
+  const demon = characters.get(succession.demon.characterId);
+  if (!demon) throw new RuleViolation("No encuentro el personaje del Demonio.");
+  return setCharacter(game, heirId, demon);
+}
+
 /**
  * Sugerencia de final según las reglas básicas. El Narrador decide: hay personajes
- * (Mujer Escarlata, Alcalde, Santo…) que cambian quién gana.
+ * (Alcalde, Santo…) que cambian quién gana. Si hay un heredero del Demonio, la partida sigue.
  */
 export function victoryHint(game: Game, characters: Map<string, Character>): VictoryHint | null {
   if (game.status === "finished") return null;
   const demons = game.players.filter((p) => characters.get(p.characterId)?.team === "demon");
   if (demons.length && demons.every((d) => !d.alive)) {
+    if (demonSuccession(game, characters)) return null;
     return { winner: "good", reason: "El Demonio ha muerto." };
   }
   const alive = alivePlayers(game).filter((p) => characters.get(p.characterId)?.team !== "traveller");

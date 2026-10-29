@@ -369,3 +369,54 @@ describe("ayudas del Narrador", () => {
     expect(g.players.flatMap((p) => p.reminders).map((r) => r.id)).toEqual(["c"]);
   });
 });
+
+describe("nuevo Demonio: Mujer escarlata y pase del Diablillo", () => {
+  // Asientos: Diablillo, Mujer escarlata, Envenenador, Chef, Empático, Lavandera, Monje.
+  const ids = ["imp", "scarletwoman", "poisoner", "chef", "empath", "washerwoman", "monk"];
+  const map = catalog.map();
+
+  it("con 5 o más vivos antes de morir, la Mujer escarlata pasa a ser el Diablillo y la partida sigue", () => {
+    const g = rules.execute(game(ids), "p0");
+    const s = rules.demonSuccession(g, map)!;
+    expect(s.heirs.map((h) => h.characterId)).toEqual(["scarletwoman"]);
+    expect(rules.victoryHint(g, map)).toBeNull();
+    const after = rules.succeedDemon(g, s, "p1", map);
+    expect(after.players[1]).toMatchObject({ characterId: "imp", alignment: "evil" });
+    expect(rules.demonSuccession(after, map)).toBeNull();
+  });
+
+  it("con 4 vivos antes de morir el Demonio, ganan los buenos", () => {
+    let g = game(ids);
+    for (const id of ["p3", "p4", "p5"]) g = rules.killPlayer(g, id);
+    g = rules.execute(g, "p0");
+    expect(rules.demonSuccession(g, map)).toBeNull();
+    expect(rules.victoryHint(g, map)?.winner).toBe("good");
+  });
+
+  it("los Viajeros no cuentan para la Mujer escarlata", () => {
+    let g = game([...ids.slice(0, 5), "thief", "beggar"]);
+    g = rules.execute(g, "p0");
+    // Quedan 4 jugadores vivos sin contar los Viajeros: sí llega.
+    expect(rules.demonSuccession(g, map)?.heirs[0].characterId).toBe("scarletwoman");
+    g = rules.killPlayer(g, "p4");
+    expect(rules.demonSuccession(g, map)).toBeNull();
+  });
+
+  it("avisa si la Mujer escarlata está envenenada", () => {
+    let g = rules.addReminder(game(ids), "p1", { id: "r", sourceCharacterId: "poisoner", label: "Envenenado" });
+    g = rules.execute(g, "p0");
+    expect(rules.demonSuccession(g, map)?.caveat).toContain("Envenenado");
+  });
+
+  it("sin Mujer escarlata, el Diablillo muerto de noche pasa a un Esbirro vivo a elegir", () => {
+    const noScarlet = ["imp", "baron", "poisoner", "chef", "empath", "washerwoman", "monk"];
+    const night = rules.killPlayer(game(noScarlet, { phase: { kind: "night", number: 2 } }), "p0");
+    const s = rules.demonSuccession(night, map)!;
+    expect(s.heirs.map((h) => h.characterId).sort()).toEqual(["baron", "poisoner"]);
+    expect(() => rules.succeedDemon(night, s, "p3", map)).toThrow();
+    // De día (ejecutado) no hay pase: ganan los buenos.
+    const day = rules.execute(game(noScarlet), "p0");
+    expect(rules.demonSuccession(day, map)).toBeNull();
+    expect(rules.victoryHint(day, map)?.winner).toBe("good");
+  });
+});

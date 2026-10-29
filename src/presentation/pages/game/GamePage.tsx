@@ -127,6 +127,8 @@ export function GamePage() {
   const player = selected ? game.players.find((p) => p.id === selected) : undefined;
   const hint = rules.victoryHint(game, characters);
   const hintKey = hint ? `${hint.winner}:${game.players.map((p) => +p.alive).join("")}` : "";
+  const succession = rules.demonSuccession(game, characters);
+  const successionKey = succession ? `succ:${game.phase.kind}:${game.players.map((p) => +p.alive).join("")}` : "";
   const name = (pid: string) => game.players.find((p) => p.id === pid)?.name ?? "";
 
   const tapPlayer = (pid: string) => {
@@ -234,13 +236,41 @@ export function GamePage() {
             Reabrir
           </button>
         </div>
+      ) : succession ? (
+        dismissedHint !== successionKey && (
+          <div className="banner banner--evil" role="alert">
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <h2>¿Nuevo Demonio?</h2>
+              <div className="small">{succession.reason}</div>
+              {succession.caveat && <div className="small muted">{succession.caveat}</div>}
+              <div className="small muted">Esta noche, despiértalo y enséñale TÚ ERES y la ficha del Demonio.</div>
+            </div>
+            <div className="row" style={{ gap: 6 }}>
+              {succession.heirs.map((h) => (
+                <button
+                  key={h.id}
+                  className="btn btn--small btn--gold"
+                  onClick={() => change((g) => rules.succeedDemon(g, succession, h.id, characters))}
+                >
+                  {h.name} ({characters.get(h.characterId)?.name}) → {characters.get(succession.demon.characterId)?.name}
+                </button>
+              ))}
+              <button className="btn btn--small" onClick={() => change((g) => rules.declareWinner(g, "good"))}>
+                Ganan los buenos
+              </button>
+              <button className="btn btn--small btn--ghost" onClick={() => setDismissedHint(successionKey)}>
+                Ahora no
+              </button>
+            </div>
+          </div>
+        )
       ) : (
         hint &&
         dismissedHint !== hintKey && (
           <div className={`banner banner--${hint.winner}`}>
             <div style={{ flex: 1, minWidth: 200 }}>
               <h2>{hint.winner === "good" ? "¿Gana el Bien?" : "¿Gana el Mal?"}</h2>
-              <div className="small muted">{hint.reason} Recuerda la Mujer Escarlata, el Alcalde, el Santo…</div>
+              <div className="small muted">{hint.reason} Recuerda el Alcalde, el Santo…</div>
             </div>
             <button className="btn btn--small btn--gold" onClick={() => change((g) => rules.declareWinner(g, hint.winner))}>
               Declarar victoria
