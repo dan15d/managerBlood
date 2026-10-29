@@ -129,12 +129,13 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
   }
 
   // Un paso por personaje en juego. El Borracho (o quien crea ser otro) se despierta como el
-  // personaje que cree ser, y el Narrador le da información falsa.
+  // personaje que cree ser, y el Narrador le da información falsa. El Lunático no: su propio
+  // paso ya le hace actuar como el Demonio que cree ser.
   const byCharacter = new Map<string, Player[]>();
   const add = (id: string, p: Player) => byCharacter.set(id, [...(byCharacter.get(id) ?? []), p]);
   for (const p of game.players) {
     add(p.characterId, p);
-    if (p.shownCharacterId) add(p.shownCharacterId, p);
+    if (p.shownCharacterId && p.characterId !== "lunatic") add(p.shownCharacterId, p);
   }
   // Las Fábulas y Lóricos no son jugadores: su paso lo hace el Narrador (anunciar, poner recordatorios…).
   for (const id of game.fabledIds ?? []) if (!byCharacter.has(id)) byCharacter.set(id, []);

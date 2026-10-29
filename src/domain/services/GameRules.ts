@@ -767,20 +767,58 @@ export function demonKill(
 export function pukkaChoose(game: Game, targetId: string, reminder: ReminderToken): { game: Game; died: Player[]; saved: Player[] } {
   const isPukkaPoison = (r: ReminderToken) => r.sourceCharacterId === "pukka" && r.label === "Envenenado";
   const previous = game.players.filter((p) => p.reminders.some(isPukkaPoison));
-  let next = game;
+  // Primero envenena al elegido: si es quien protegía al anterior (la Dama del té, el Monje…), ya no le protege.
+  let next = addReminder(game, targetId, reminder);
   const died: Player[] = [];
   const saved: Player[] = [];
   for (const p of previous) {
-    // Deja de estar envenenado: muere (si no está protegido) y después está sano.
-    next = updatePlayer(next, p.id, (x) => ({ ...x, reminders: x.reminders.filter((r) => !isPukkaPoison(r)) }));
+    // Muere (si no está protegido) todavía envenenado, y después está sano.
+    const protectedNow = p.alive && isProtected(next, findPlayer(next, p.id)!);
+    next = updatePlayer(next, p.id, (x) => ({ ...x, reminders: x.reminders.filter((r) => r.id === reminder.id || !isPukkaPoison(r)) }));
     if (!p.alive) continue;
-    if (isProtected(game, p)) saved.push(p);
+    if (protectedNow) saved.push(p);
     else {
       next = killPlayer(next, p.id, "muere por el veneno del Pukka");
       died.push(p);
     }
   }
-  return { game: addReminder(next, targetId, reminder), died, saved };
+  return { game: next, died, saved };
+}
+
+/**
+ * No puede morir esta noche por nada (no solo por el Demonio): Marinero sano, vecino bueno de la
+ * Dama del té o «A salvo» de un Posadero sano. El Monje y el Soldado solo protegen del Demonio.
+ */
+const cannotDie = (game: Game, target: Player) =>
+  (target.characterId === "sailor" && healthy(target)) ||
+  teaLadyProtects(game, target) ||
+  target.reminders.some((r) => (r.label === "No puede morir" || (r.sourceCharacterId === "innkeeper" && r.label === "A salvo")) && protectionWorks(game, r.sourceCharacterId));
+
+const ASSASSIN_USED = "Sin habilidad";
+
+/**
+ * Un Esbirro que mata de noche. El Asesino (una vez por partida) mata aunque el elegido no pudiera
+ * morir; el Padrino respeta lo que impide morir (Marinero, Dama del té, Posadero, Bufón).
+ */
+export function minionKill(game: Game, targetId: string, reminder: ReminderToken, characters: Map<string, Character>): { game: Game; message: string } {
+  const target = findPlayer(game, targetId)!;
+  const source = reminder.sourceCharacterId;
+  const killer = game.players.find((p) => p.characterId === source && p.alive);
+  const name = characters.get(source)?.name ?? source;
+  const copies = reminderCopies(reminder, characters);
+  if (source === "assassin" && killer && has(killer, "assassin", ASSASSIN_USED)) {
+    return { game, message: `El ${name} ya usó su habilidad: ${target.name} no muere.` };
+  }
+  let next = placeReminder(game, targetId, reminder, copies);
+  if (source === "assassin" && killer) next = withReminder(next, killer.id, "assassin", ASSASSIN_USED);
+  if (!killer || !healthy(killer)) return { game: next, message: `El ${name} no tiene habilidad esta noche (borracho o envenenado): ${target.name} no muere.` };
+  if (!target.alive) return { game: next, message: `${target.name} ya estaba muerto.` };
+  if (source !== "assassin") {
+    if (cannotDie(next, target)) return { game: next, message: `${target.name} no puede morir esta noche y no muere.` };
+    if (foolSurvives(target)) return { game: withReminder(next, targetId, "fool", "Sin habilidad"), message: `${target.name} es el Bufón: esta vez no muere y pierde su habilidad.` };
+  }
+  next = killPlayer(next, targetId, `muere por el ${name}`);
+  return { game: next, message: `${target.name} muere esta noche${source === "assassin" ? ", aunque estuviera protegido" : ""}. Se anunciará al amanecer.` };
 }
 
 /** Tantas fichas de recordatorio como tiene el personaje en su ficha (0: sin límite). */
@@ -822,6 +860,10 @@ export function applyReminderChoice(
       reminders: p.reminders.filter((r) => !(r.sourceCharacterId === "shabaloth" && r.label === "Muerto")),
     }));
     return { game: placeReminder(regurgitated, targetId, reminder, copies), message: `El Shabaloth regurgita a ${target.name}: vuelve a la vida.` };
+  }
+
+  if (night && reminder.label === "Muerto" && (reminder.sourceCharacterId === "assassin" || reminder.sourceCharacterId === "godfather")) {
+    return minionKill(game, targetId, reminder, characters);
   }
 
   if (night && isDemonKill(reminder, characters)) {

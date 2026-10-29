@@ -259,6 +259,13 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
           ? `Señala a ${grandchild.name} y enséñale ${characters.get(grandchild.characterId)?.name}.`
           : null;
       }
+      case "eviltwin": {
+        const twin = game.players.find((p) => p.reminders.some((r) => r.sourceCharacterId === "eviltwin" && r.label === "Gemelo"));
+        if (!twin) return "Falta poner el recordatorio «Gemelo» en un jugador bueno.";
+        return game.phase.number === 1 && game.phase.kind === "night"
+          ? `El gemelo bueno es ${twin.name} (${characters.get(twin.characterId)?.name}): despierta a ${self.name} y a ${twin.name}, y enséñale a cada uno el personaje del otro.`
+          : null;
+      }
       case "sage": {
         // Solo si el Demonio le ha matado esta noche (el paso ya dice si toca despertarle).
         if (!(game.nightDeaths ?? []).includes(self.id)) return null;
