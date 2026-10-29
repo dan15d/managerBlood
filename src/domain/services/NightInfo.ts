@@ -59,10 +59,42 @@ export const CHOICE_REMINDER: Record<string, string> = {
   bureaucrat: "3 votos",
   thief: "Voto negativo",
   snakecharmer: "Envenenado",
+  // Eligen para recibir información: no ponen recordatorio, la app da la respuesta.
+  dreamer: "Elegido",
+  ravenkeeper: "Elegido",
+  villageidiot: "Elegido",
 };
 
-/** Quien al elegir no pone recordatorio sino que intercambia personajes (el botón no lo nombra). */
-export const SWAPS_ON_CHOICE = new Set(["snakecharmer"]);
+/** Quien elige para recibir información sobre el elegido (la app da la respuesta). */
+const INFO_ON_CHOICE = new Set(["dreamer", "ravenkeeper", "villageidiot"]);
+
+/**
+ * Quien al elegir no pone recordatorio: el Encantador de serpientes (intercambia personajes) y
+ * los que reciben información sobre el elegido. El botón no nombra ningún recordatorio.
+ */
+export const CHOICE_WITHOUT_REMINDER = new Set(["snakecharmer", ...INFO_ON_CHOICE]);
+
+export const isInfoChoice = (characterId: string) => INFO_ON_CHOICE.has(characterId);
+
+/**
+ * La respuesta para quien elige a un jugador para saber de él (Soñador, Guardián de cuervos,
+ * Tonto del pueblo), con los avisos de siempre: Espía o Recluso, Vortox y quien elige sin habilidad.
+ */
+export function infoChoiceAnswer(game: Game, chooserCharacterId: string, target: Player, characters: Map<string, Character>): string {
+  const character = characters.get(target.characterId);
+  const name = character?.name ?? target.characterId;
+  const good = target.alignment === "good";
+  const answer = {
+    dreamer: `${target.name} es ${name} (${good ? "bueno" : "malo"}): enséñale ${name} y un personaje ${good ? "malo" : "bueno"} que no esté en su sitio.`,
+    ravenkeeper: `Enséñale ${name}, el personaje de ${target.name}.`,
+    villageidiot: `${target.name} es ${good ? "bueno: pulgar hacia arriba" : "malo: pulgar hacia abajo"}.`,
+  }[chooserCharacterId as "dreamer" | "ravenkeeper" | "villageidiot"];
+  const chooser = characters.get(chooserCharacterId);
+  const notes = chooser ? commonCaveats(game, characters, chooser) : [];
+  const working = game.players.some((p) => p.characterId === chooserCharacterId && !p.reminders.some((r) => /envenen|borrach|sin habilidad/i.test(r.label)));
+  if (!working) notes.unshift("Quien elige no tiene habilidad (Borracho, envenenado…): puedes darle información falsa.");
+  return [answer, ...notes].join(" ");
+}
 
 /** Lo que pone quien elige esta noche: el Lleech, la primera noche, envenena a su huésped. */
 export const choiceReminder = (characterId: string, firstNight: boolean): string | undefined =>
@@ -83,6 +115,24 @@ export function aliveNeighbours(game: Game, player: Player): Player[] {
     return undefined;
   };
   return [...new Set([walk(-1), walk(1)].filter((p): p is Player => !!p))];
+}
+
+/**
+ * Hacia qué lado está el jugador malo más cercano (vivo o muerto), como aprende el Shugenja:
+ * "clockwise" (sentido de las agujas del reloj), "counter", "both" si están a la misma distancia.
+ */
+export function nearestEvilSide(game: Game, from: Player): "clockwise" | "counter" | "both" | undefined {
+  const seated = [...game.players].sort((a, b) => a.seat - b.seat);
+  const n = seated.length;
+  const at = seated.findIndex((p) => p.id === from.id);
+  for (let k = 1; k < n; k++) {
+    const cw = seated[(at + k) % n].alignment === "evil";
+    const ccw = seated[(at - k + n) % n].alignment === "evil";
+    if (cw && ccw) return "both";
+    if (cw) return "clockwise";
+    if (ccw) return "counter";
+  }
+  return undefined;
 }
 
 /** Parejas de jugadores malos sentados juntos (vivos o muertos), como cuenta el Chef. */
@@ -122,6 +172,7 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
   const caveats = commonCaveats(game, characters, character);
   const others = (self: Player, t: string) => game.players.filter((p) => p.id !== self.id && team(p) === t);
   const list = (ps: Player[]) => ps.map((p) => label(p, characters)).join(", ");
+  const demons = demonPlayers(game, characters);
 
   const answer = (self: Player): string | null => {
     switch (character.id) {
@@ -176,6 +227,69 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
         const voted = game.nominations.some((n) => n.voterIds.some((id) => demonIds.has(id)));
         return voted ? "Asiente: el Demonio ha votado hoy." : "Niega: hoy el Demonio no ha votado.";
       }
+      case "oracle": {
+        const evilDead = game.players.filter((p) => !p.alive && p.alignment === "evil").length;
+        return `Enseña ${evilDead} con los dedos (muertos malos).`;
+      }
+      case "shugenja": {
+        const side = nearestEvilSide(game, self);
+        return side === "both"
+          ? "Equidistante: señala hacia el lado que quieras."
+          : side
+            ? `Señala ${side === "clockwise" ? "en el sentido de las agujas del reloj" : "en sentido contrario a las agujas del reloj"}.`
+            : null;
+      }
+      case "knight": {
+        const notDemon = game.players.filter((p) => p.id !== self.id && !demons.some((d) => d.id === p.id));
+        return `Señala a 2 de estos (no son el Demonio): ${list(notDemon)}.`;
+      }
+      case "noble": {
+        const evil = game.players.filter((p) => p.id !== self.id && p.alignment === "evil");
+        const good = game.players.filter((p) => p.id !== self.id && p.alignment === "good");
+        return `Señala a 1 malo (${list(evil)}) y 2 buenos (${list(good)}).`;
+      }
+      case "steward": {
+        const good = game.players.filter((p) => p.id !== self.id && p.alignment === "good");
+        return `Señala a 1 jugador bueno: ${list(good)}.`;
+      }
+      case "grandmother": {
+        const grandchild = game.players.find((p) => p.reminders.some((r) => r.sourceCharacterId === "grandmother" && r.label === "Nieto"));
+        if (!grandchild) return "Falta poner el recordatorio «Nieto» en un jugador bueno.";
+        return game.phase.number === 1 && game.phase.kind === "night"
+          ? `Señala a ${grandchild.name} y enséñale ${characters.get(grandchild.characterId)?.name}.`
+          : null;
+      }
+      case "sage": {
+        // Solo si el Demonio le ha matado esta noche (el paso ya dice si toca despertarle).
+        if (!(game.nightDeaths ?? []).includes(self.id)) return null;
+        return `Señala al Demonio (${demons.map((p) => p.name).join(" o ")}) y a otro jugador.`;
+      }
+      case "king": {
+        if (game.phase.number === 1) return `El Rey es ${self.name}: señálaselo al Demonio.`;
+        const dead = game.players.filter((p) => !p.alive).length;
+        const alive = game.players.filter((p) => p.alive);
+        return dead >= alive.length
+          ? `Hay tantos muertos como vivos o más: enséñale el personaje de 1 vivo (${list(alive.filter((p) => p.id !== self.id))}).`
+          : "Hay más vivos que muertos: no le despiertes.";
+      }
+      case "choirboy": {
+        const king = game.players.find((p) => p.characterId === "king");
+        const killedByDemon = king && (game.nightDeaths ?? []).includes(king.id) && king.reminders.some((r) => r.label === "Muerto" && characters.get(r.sourceCharacterId)?.team === "demon");
+        return killedByDemon ? `El Demonio ha matado al Rey: señala al Demonio (${demons.map((p) => p.name).join(", ")}).` : "El Demonio no ha matado al Rey esta noche: no le despiertes.";
+      }
+      case "bountyhunter": {
+        const known = game.players.find((p) => p.reminders.some((r) => r.sourceCharacterId === "bountyhunter" && r.label === "Conocido"));
+        const evil = game.players.filter((p) => p.alive && p.alignment === "evil" && p.id !== known?.id);
+        if (!known) return `Falta poner «Conocido» en un jugador malo: ${list(evil)}.`;
+        if (game.phase.number === 1 && game.phase.kind === "night") return `Señala a ${known.name}.`;
+        const diedRecently = [...(game.nightDeaths ?? []), ...(game.dayDeaths ?? [])].includes(known.id);
+        return diedRecently ? `Ha muerto ${known.name}: mueve «Conocido» y señala a otro malo (${list(evil)}).` : "Su jugador conocido sigue vivo: no le despiertes.";
+      }
+      case "godfather":
+        if (game.phase.number !== 1) return null;
+        return `Forasteros en juego: ${list(game.players.filter((p) => team(p) === "outsider")) || "ninguno"}.`;
+      case "marionette":
+        return `Despierta al Demonio y señálale a la Marioneta: ${self.name}.`;
       case "zombuul": {
         // Solo ataca si nadie ha muerto durante el día (también cuenta su propia muerte aparente).
         const died = (game.dayDeaths ?? []).map((id) => game.players.find((p) => p.id === id)?.name).filter(Boolean);

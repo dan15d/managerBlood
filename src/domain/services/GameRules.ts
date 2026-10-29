@@ -1,7 +1,7 @@
 import type { Alignment, Character } from "../entities/Character";
 import type { Game, Nomination, Phase, Player, ReminderToken } from "../entities/Game";
 import { RuleViolation } from "../errors";
-import { aliveNeighbours } from "./NightInfo";
+import { aliveNeighbours, infoChoiceAnswer, isInfoChoice } from "./NightInfo";
 import {
   demonPlayers,
   has,
@@ -805,6 +805,8 @@ export function applyReminderChoice(
 
   // El Encantador de serpientes no pone recordatorio: si elige al Demonio, intercambian.
   if (night && reminder.sourceCharacterId === "snakecharmer") return snakeCharmerChoose(game, targetId, characters);
+  // Soñador, Guardián de cuervos, Tonto del pueblo: no cambia nada, solo se da la respuesta.
+  if (night && isInfoChoice(reminder.sourceCharacterId)) return { game, message: infoChoiceAnswer(game, reminder.sourceCharacterId, target, characters) };
 
   if (night && reminder.sourceCharacterId === "pukka" && reminder.label === "Envenenado") {
     const r = pukkaChoose(game, targetId, reminder);
