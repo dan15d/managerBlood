@@ -2,6 +2,7 @@ import type { Alignment, Character } from "../entities/Character";
 import type { Game, Nomination, Phase, Player, ReminderToken } from "../entities/Game";
 import { RuleViolation } from "../errors";
 import { aliveNeighbours, infoChoiceAnswer, isInfoChoice } from "./NightInfo";
+import { nearestTownsfolk } from "./SetupGenerator";
 import {
   demonPlayers,
   has,
@@ -119,6 +120,44 @@ export function setCharacter(game: Game, playerId: string, character: Character,
 }
 
 /**
+ * El Filósofo elige un personaje bueno y gana su habilidad: se le cambia la ficha por ese
+ * personaje (así despierta como él) con el recordatorio «Es el Filósofo». Si el personaje está en
+ * juego, quien lo tiene queda borracho mientras tanto.
+ */
+export function philosopherChoose(game: Game, philosopherId: string, characterId: string, characters: Map<string, Character>): { game: Game; message: string } {
+  const philosopher = findPlayer(game, philosopherId);
+  const chosen = characters.get(characterId);
+  if (!philosopher || philosopher.characterId !== "philosopher") throw new RuleViolation("Ese jugador no es el Filósofo.");
+  if (!chosen || (chosen.team !== "townsfolk" && chosen.team !== "outsider")) throw new RuleViolation("El Filósofo elige un personaje bueno.");
+  const works = healthy(philosopher);
+  const holders = game.players.filter((p) => p.id !== philosopherId && p.characterId === characterId);
+  let next = withReminder(setCharacter(game, philosopherId, chosen, true), philosopherId, "philosopher", "Es el Filósofo");
+  if (works) for (const h of holders) next = withReminder(next, h.id, "philosopher", "Borracho");
+  const parts = [`${philosopher.name} gana la habilidad de ${chosen.name}: desde ahora despierta como ${chosen.name}.`];
+  if (!works) parts.push("Está borracho o envenenado: en realidad no la gana, dale información falsa.");
+  else if (holders.length) parts.push(`${holders.map((p) => p.name).join(", ")} (${chosen.name}) queda borracho.`);
+  return { game: next, message: parts.join(" ") };
+}
+
+/**
+ * La Pit-Hag convierte a un jugador en un personaje que no está en juego. Conserva su bando. Si
+ * crea un Demonio, las muertes de esa noche las decide el Narrador.
+ */
+export function pitHagChoose(game: Game, targetId: string, characterId: string, characters: Map<string, Character>): { game: Game; message: string } {
+  const target = findPlayer(game, targetId);
+  const character = characters.get(characterId);
+  if (!target || !character) throw new RuleViolation("Ese jugador o personaje no existe.");
+  if (game.players.some((p) => p.characterId === characterId)) return { game, message: `${character.name} ya está en juego: no pasa nada.` };
+  const hag = game.players.find((p) => p.characterId === "pithag" && (p.alive || has(p, "vigormortis", "Tiene habilidad")));
+  if (!hag || !healthy(hag)) return { game, message: `La Pit-Hag no tiene habilidad esta noche (borracha o envenenada): ${target.name} no cambia.` };
+  const demon = character.team === "demon" ? " Has creado un Demonio: las muertes de esta noche las decides tú." : "";
+  return {
+    game: setCharacter(game, targetId, character, true),
+    message: `${target.name} pasa a ser ${character.name}: despiértale y enséñale TÚ ERES y su nuevo personaje.${demon}`,
+  };
+}
+
+/**
  * Dos jugadores intercambian personajes (con lo que cree ser cada uno). El Encantador de
  * serpientes intercambia también el bando; el Barbero, no.
  */
@@ -212,6 +251,8 @@ export const DUSK_REMINDERS = new Set([
   "innkeeper:A salvo",
   "innkeeper:Borracho",
   "sailor:Borracho",
+  "goon:Borracho",
+  "minstrel:Borracho",
   "undertaker:Muerto hoy",
   "exorcist:Elegido",
   "devilsadvocate:Sobrevive ejecución",
@@ -220,7 +261,6 @@ export const DUSK_REMINDERS = new Set([
   "harpy:Loco",
   "harpy:Segundo jugador",
   "lunatic:Elegido",
-  "minstrel:Todos están borrachos",
   "acrobat:Elegido",
   "flowergirl:Demonio ha votado",
   "flowergirl:Demonio no ha votado",
@@ -236,6 +276,9 @@ export const DUSK_REMINDERS = new Set([
   "bureaucrat:3 votos",
   "thief:Voto negativo",
 ]);
+
+/** La borrachera del Juglar: el día de la ejecución aún no caduca; al amanecer pasa a «Borracho». */
+export const MINSTREL_TOMORROW = "Borracho hasta mañana";
 
 /**
  * Las muertes de una noche («Muerto» de cualquier Demonio o personaje que mata) también caducan,
@@ -283,9 +326,12 @@ export function startDay(game: Game): Game {
     dayDeaths: [],
     butcherNominationId: undefined,
     // El «No mata» de la Princesa solo valía la noche que acaba, y al nuevo Demonio ya se le ha dicho.
+    // La borrachera del Juglar caduca en el crepúsculo de este día.
     players: game.players.map((p) => ({
       ...p,
-      reminders: p.reminders.filter((r) => !(r.sourceCharacterId === "princess" && r.label === "No mata") && r.label !== NEW_DEMON),
+      reminders: p.reminders
+        .filter((r) => !(r.sourceCharacterId === "princess" && r.label === "No mata") && r.label !== NEW_DEMON)
+        .map((r) => (r.sourceCharacterId === "minstrel" && r.label === MINSTREL_TOMORROW ? { ...r, label: "Borracho" } : r)),
     })),
   };
   return touch(next, died.length ? `Amanece. Han muerto esta noche: ${died.join(", ")}.` : "Amanece. Nadie ha muerto esta noche.");
@@ -545,6 +591,16 @@ export function execute(game: Game, playerId: string, characters?: Map<string, C
     after =
       player.alive || zombuulSeemsDead(player) ? killPlayer(game, playerId, "es ejecutado") : touch(game, `${player.name} es ejecutado (ya estaba muerto).`);
   }
+  // Juglar: si muere un Esbirro ejecutado, todos los demás (salvo Viajeros) están borrachos hasta
+  // el crepúsculo de mañana: cada uno lleva su «Borracho» y así lo tienen en cuenta todas las reglas.
+  const minstrel = after.players.find((p) => p.characterId === "minstrel" && p.alive && healthy(p));
+  const minionDied = characters?.get(player.characterId)?.team === "minion" && player.alive && !findPlayer(after, playerId)?.alive;
+  if (characters && minstrel && minionDied) {
+    for (const p of after.players) {
+      if (p.id !== minstrel.id && characters.get(p.characterId)?.team !== "traveller") after = withReminder(after, p.id, "minstrel", MINSTREL_TOMORROW);
+    }
+    after = touch(after, "Ha muerto un Esbirro ejecutado: por el Juglar, todos están borrachos hasta el crepúsculo de mañana.");
+  }
   // El Leviatán cuenta los buenos ejecutados: con el segundo, gana el Mal.
   const leviathan = after.players.some((p) => p.characterId === "leviathan" && reallyAlive(p));
   if (leviathan && player.alignment === "good") after = withReminder(after, playerId, "leviathan", LEVIATHAN_GOOD_EXECUTED);
@@ -698,7 +754,7 @@ const PROTECTION = /^(a salvo|protegido|no puede morir)$/i;
 export const isDemonKill = (reminder: Pick<ReminderToken, "sourceCharacterId" | "label">, characters: Map<string, Character>) =>
   reminder.label === "Muerto" && characters.get(reminder.sourceCharacterId)?.team === "demon";
 
-export type DemonKillOutcome = "killed" | "protected" | "selfKill" | "mayor" | "jump" | "fool" | "banshee" | "blocked" | "alreadyDead";
+export type DemonKillOutcome = "killed" | "protected" | "selfKill" | "mayor" | "jump" | "fool" | "banshee" | "blocked" | "alreadyDead" | "drunk";
 
 /**
  * Un recordatorio de protección solo vale si quien lo pone está de verdad en juego y sano: el
@@ -757,6 +813,9 @@ export function demonKill(
   if (!target) throw new RuleViolation("Ese jugador no está en la partida.");
   if (!target.alive && !zombuulSeemsDead(target)) return { game: placeReminder(game, targetId, reminder, copies), outcome: "alreadyDead" };
   if (demonBlocked(game, reminder.sourceCharacterId)) return { game, outcome: "blocked" };
+  // Un Demonio borracho o envenenado (Marinero, Matón, Cortesano…) no mata.
+  const attacker = game.players.find((p) => p.characterId === reminder.sourceCharacterId && reallyAlive(p));
+  if (attacker && !healthy(attacker)) return { game, outcome: "drunk" };
   if (isProtected(game, target)) return { game, outcome: "protected" };
   const demonCharacter = characters.get(reminder.sourceCharacterId);
   const demon = demonCharacter?.name ?? "el Demonio";
@@ -833,7 +892,8 @@ const ASSASSIN_USED = "Sin habilidad";
 export function minionKill(game: Game, targetId: string, reminder: ReminderToken, characters: Map<string, Character>): { game: Game; message: string } {
   const target = findPlayer(game, targetId)!;
   const source = reminder.sourceCharacterId;
-  const killer = game.players.find((p) => p.characterId === source && p.alive);
+  // El Esbirro muerto por el Vigormortis conserva su habilidad.
+  const killer = game.players.find((p) => p.characterId === source && (p.alive || has(p, "vigormortis", "Tiene habilidad")));
   const name = characters.get(source)?.name ?? source;
   const copies = reminderCopies(reminder, characters);
   if (source === "assassin" && killer && has(killer, "assassin", ASSASSIN_USED)) {
@@ -856,9 +916,26 @@ const reminderCopies = (reminder: ReminderToken, characters: Map<string, Charact
   characters.get(reminder.sourceCharacterId)?.reminders.filter((l) => l === reminder.label).length ?? 0;
 
 /**
+ * Matón: el primer jugador que le elige cada noche por su habilidad queda borracho hasta el
+ * crepúsculo, y el Matón pasa a su bando. Null si no es el caso.
+ */
+function goonChosen(game: Game, targetId: string, sourceId: string, characters: Map<string, Character>): { game: Game; message: string } | null {
+  const goon = findPlayer(game, targetId);
+  if (game.phase.kind !== "night" || goon?.characterId !== "goon" || !goon.alive || !healthy(goon)) return null;
+  if (game.players.some((p) => has(p, "goon", "Borracho"))) return null;
+  const chooser = game.players.find((p) => p.characterId === sourceId && p.id !== targetId && (p.alive || has(p, "vigormortis", "Tiene habilidad")));
+  if (!chooser || !["townsfolk", "outsider", "minion", "demon"].includes(characters.get(sourceId)?.team ?? "")) return null;
+  const next = updatePlayer(withReminder(game, chooser.id, "goon", "Borracho"), targetId, (p) => ({ ...p, alignment: chooser.alignment }));
+  return {
+    game: touch(next, `${goon.name} es el Matón: ${chooser.name} queda borracho y el Matón pasa a ser ${chooser.alignment === "good" ? "bueno" : "malo"}.`),
+    message: `${goon.name} es el Matón: ${chooser.name} queda borracho hasta el crepúsculo (su elección no hace efecto) y el Matón pasa a ser ${chooser.alignment === "good" ? "bueno" : "malo"}.`,
+  };
+}
+
+/**
  * Poner el recordatorio de lo que elige un personaje por la noche y aplicar lo que provoca:
  * el ataque del Demonio, el veneno del Pukka, el «Vivo» del Shabaloth… Devuelve también el
- * aviso para el Narrador.
+ * aviso para el Narrador. Si elige al Matón, primero se aplica el Matón.
  */
 export function applyReminderChoice(
   game: Game,
@@ -866,6 +943,15 @@ export function applyReminderChoice(
   reminder: ReminderToken,
   characters: Map<string, Character>,
 ): { game: Game; message: string } {
+  const goon = goonChosen(game, targetId, reminder.sourceCharacterId, characters);
+  if (!goon) return applyChoice(game, targetId, reminder, characters);
+  // Quien elige queda borracho: su elección no hace efecto (la información sí se da, y puede ser falsa).
+  if (!isInfoChoice(reminder.sourceCharacterId)) return goon;
+  const result = applyChoice(goon.game, targetId, reminder, characters);
+  return { game: result.game, message: `${goon.message} ${result.message}` };
+}
+
+function applyChoice(game: Game, targetId: string, reminder: ReminderToken, characters: Map<string, Character>): { game: Game; message: string } {
   const target = findPlayer(game, targetId);
   if (!target) throw new RuleViolation("Ese jugador no está en la partida.");
   const copies = reminderCopies(reminder, characters);
@@ -873,6 +959,8 @@ export function applyReminderChoice(
 
   // El Encantador de serpientes no pone recordatorio: si elige al Demonio, intercambian.
   if (night && reminder.sourceCharacterId === "snakecharmer") return snakeCharmerChoose(game, targetId, characters);
+  // La Pit-Hag: el personaje nuevo se elige después (pitHagChoose).
+  if (night && reminder.sourceCharacterId === "pithag") return { game, message: `Elige el nuevo personaje de ${target.name}.` };
   // Soñador, Guardián de cuervos, Tonto del pueblo: no cambia nada, solo se da la respuesta.
   if (night && isInfoChoice(reminder.sourceCharacterId)) return { game, message: infoChoiceAnswer(game, reminder.sourceCharacterId, target, characters) };
 
@@ -911,8 +999,52 @@ export function applyReminderChoice(
       killed: next.players.find((p) => p.id === targetId)?.alive
         ? `${target.name} no muere esta vez.`
         : `${target.name} muere esta noche. Se anunciará al amanecer.`,
+      drunk: `El ${demon} está borracho o envenenado: ${target.name} no muere.`,
     }[outcome];
+    // Vigormortis: el Esbirro que mata conserva su habilidad y envenena a 1 Aldeano vecino.
+    if (outcome === "killed" && reminder.sourceCharacterId === "vigormortis" && characters.get(target.characterId)?.team === "minion") {
+      const neighbours = nearestTownsfolk(next.players, target, characters).map((p) => p.name);
+      return {
+        game: withReminder(next, targetId, "vigormortis", "Tiene habilidad"),
+        message: `${message} Es Esbirro: conserva su habilidad. Pon «Envenenado» del Vigormortis en 1 de sus Aldeanos vecinos (${neighbours.join(" o ")}).`,
+      };
+    }
     return { game: next, message };
+  }
+
+  // Profesor: una vez por partida resucita a un Aldeano muerto.
+  if (night && reminder.sourceCharacterId === "professor" && reminder.label === "Vivo") {
+    const professor = game.players.find((p) => p.characterId === "professor" && p.alive);
+    if (target.alive) return { game, message: `${target.name} está vivo: el Profesor elige a un jugador muerto.` };
+    if (professor && has(professor, "professor", "Sin habilidad")) return { game, message: "El Profesor ya usó su habilidad." };
+    const used = professor ? withReminder(game, professor.id, "professor", "Sin habilidad") : game;
+    if (!professor || !healthy(professor)) return { game: used, message: `El Profesor no tiene habilidad (borracho o envenenado): ${target.name} sigue muerto.` };
+    if (characters.get(target.characterId)?.team !== "townsfolk") return { game: used, message: `${target.name} no es Aldeano: sigue muerto.` };
+    return { game: placeReminder(revivePlayer(used, targetId), targetId, reminder, copies), message: `${target.name} es Aldeano y resucita.` };
+  }
+
+  // Cortesano: una vez por partida, el elegido está borracho 3 días y 3 noches.
+  if (night && reminder.sourceCharacterId === "courtier" && reminder.label === "Borracho 1") {
+    const courtier = game.players.find((p) => p.characterId === "courtier" && p.alive);
+    if (courtier && has(courtier, "courtier", "Sin habilidad")) return { game, message: "El Cortesano ya usó su habilidad." };
+    const used = courtier ? withReminder(game, courtier.id, "courtier", "Sin habilidad") : game;
+    if (!courtier || !healthy(courtier)) return { game: used, message: "El Cortesano no tiene habilidad (borracho o envenenado): nadie queda borracho." };
+    return {
+      game: placeReminder(used, targetId, reminder, copies),
+      message: `${target.name} está borracho 3 días y 3 noches: cada noche cambia su «Borracho 1» por «Borracho 2» y luego «Borracho 3».`,
+    };
+  }
+
+  // Niña de la Luna: el jugador que eligió al morir muere esta noche si es bueno.
+  if (night && reminder.sourceCharacterId === "moonchild" && reminder.label === "Muerto") {
+    const moonchild = game.players.find((p) => p.characterId === "moonchild" && !p.alive);
+    let next = placeReminder(game, targetId, reminder, copies);
+    if (moonchild) next = withReminder(next, moonchild.id, "moonchild", "Sin habilidad");
+    if (!moonchild || !healthy(moonchild)) return { game: next, message: `La Niña de la Luna no tiene habilidad (borracha o envenenada): ${target.name} no muere.` };
+    if (target.alignment !== "good") return { game: next, message: `${target.name} es del bando malo: no muere.` };
+    if (!target.alive) return { game: next, message: `${target.name} ya estaba muerto.` };
+    if (cannotDie(next, target)) return { game: next, message: `${target.name} es del bando bueno, pero no puede morir esta noche.` };
+    return { game: killPlayer(next, targetId, "muere por la Niña de la Luna"), message: `${target.name} es del bando bueno y muere esta noche. Se anunciará al amanecer.` };
   }
 
   const placed = game.players.filter((p) => p.reminders.some((r) => r.sourceCharacterId === reminder.sourceCharacterId && r.label === reminder.label));

@@ -1,6 +1,7 @@
 import type { Character } from "../entities/Character";
 import type { Game, Player } from "../entities/Game";
 import { demonPlayers, NEW_DEMON } from "./Demons";
+import { buildNightOrder } from "./NightOrder";
 
 // La respuesta verdadera de los personajes de información, calculada con el Grimorio.
 // Es una ayuda: el Narrador decide si la da (o da otra si está borracho, envenenado…).
@@ -24,7 +25,7 @@ export const CHOICE_REMINDER: Record<string, string> = {
   innkeeper: "A salvo",
   sailor: "Borracho",
   exorcist: "Elegido",
-  gambler: "Muerto",
+  moonchild: "Muerto",
   devilsadvocate: "Sobrevive ejecución",
   assassin: "Muerto",
   godfather: "Muerto",
@@ -59,20 +60,23 @@ export const CHOICE_REMINDER: Record<string, string> = {
   bureaucrat: "3 votos",
   thief: "Voto negativo",
   snakecharmer: "Envenenado",
+  // La Pit-Hag elige jugador y después el personaje en el que se convierte.
+  pithag: "Elegido",
   // Eligen para recibir información: no ponen recordatorio, la app da la respuesta.
   dreamer: "Elegido",
   ravenkeeper: "Elegido",
   villageidiot: "Elegido",
+  gambler: "Elegido",
 };
 
 /** Quien elige para recibir información sobre el elegido (la app da la respuesta). */
-const INFO_ON_CHOICE = new Set(["dreamer", "ravenkeeper", "villageidiot"]);
+const INFO_ON_CHOICE = new Set(["dreamer", "ravenkeeper", "villageidiot", "gambler"]);
 
 /**
  * Quien al elegir no pone recordatorio: el Encantador de serpientes (intercambia personajes) y
  * los que reciben información sobre el elegido. El botón no nombra ningún recordatorio.
  */
-export const CHOICE_WITHOUT_REMINDER = new Set(["snakecharmer", ...INFO_ON_CHOICE]);
+export const CHOICE_WITHOUT_REMINDER = new Set(["snakecharmer", "pithag", ...INFO_ON_CHOICE]);
 
 export const isInfoChoice = (characterId: string) => INFO_ON_CHOICE.has(characterId);
 
@@ -88,7 +92,8 @@ export function infoChoiceAnswer(game: Game, chooserCharacterId: string, target:
     dreamer: `${target.name} es ${name} (${good ? "bueno" : "malo"}): enséñale ${name} y un personaje ${good ? "malo" : "bueno"} que no esté en su sitio.`,
     ravenkeeper: `Enséñale ${name}, el personaje de ${target.name}.`,
     villageidiot: `${target.name} es ${good ? "bueno: pulgar hacia arriba" : "malo: pulgar hacia abajo"}.`,
-  }[chooserCharacterId as "dreamer" | "ravenkeeper" | "villageidiot"];
+    gambler: `${target.name} es ${name}. Si el Tahúr no ha acertado, muere: márcale muerto.`,
+  }[chooserCharacterId as "dreamer" | "ravenkeeper" | "villageidiot" | "gambler"];
   const chooser = characters.get(chooserCharacterId);
   const notes = chooser ? commonCaveats(game, characters, chooser) : [];
   const working = game.players.some((p) => p.characterId === chooserCharacterId && !p.reminders.some((r) => /envenen|borrach|sin habilidad/i.test(r.label)));
@@ -98,7 +103,7 @@ export function infoChoiceAnswer(game: Game, chooserCharacterId: string, target:
 
 /** Lo que pone quien elige esta noche: el Lleech, la primera noche, envenena a su huésped. */
 export const choiceReminder = (characterId: string, firstNight: boolean): string | undefined =>
-  characterId === "lleech" && firstNight ? "Envenenado" : CHOICE_REMINDER[characterId];
+  characterId === "lleech" && firstNight ? "Envenenado" : ["godfather", "pithag"].includes(characterId) && firstNight ? undefined : CHOICE_REMINDER[characterId];
 
 const label = (p: Player, characters: Map<string, Character>) => `${p.seat + 1}. ${p.name} (${characters.get(p.characterId)?.name ?? "?"})`;
 
@@ -158,6 +163,9 @@ function commonCaveats(game: Game, characters: Map<string, Character>, character
   const misregister = ["spy", "recluse"].filter((id) => inPlay.has(id)).map((id) => characters.get(id)!.name);
   if (misregister.length) caveats.push(`${misregister.join(" y ")} ${misregister.length > 1 ? "pueden aparecer distintos" : "puede aparecer distinto"}: decides tú.`);
   if (inPlay.has("vortox") && character.team === "townsfolk") caveats.push("Con Vortox en juego, la información de los Aldeanos debe ser falsa.");
+  if (game.players.some((p) => p.reminders.some((r) => r.sourceCharacterId === "minstrel"))) {
+    caveats.push("Por el Juglar todos (salvo él) están borrachos: la información puede ser falsa.");
+  }
   return caveats;
 }
 
@@ -258,6 +266,18 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
         return game.phase.number === 1 && game.phase.kind === "night"
           ? `Señala a ${grandchild.name} y enséñale ${characters.get(grandchild.characterId)?.name}.`
           : null;
+      }
+      case "chambermaid": {
+        // Quienes tienen paso esta noche y no se saltan (el Borracho no despierta por su habilidad).
+        const woke = new Set(
+          buildNightOrder(game, characters)
+            .filter((s) => s.kind === "character" && !s.dead && s.character?.id !== "chambermaid")
+            .flatMap((s) => s.playerIds.filter((id) => !s.deceivedPlayerIds?.includes(id))),
+        );
+        const names = game.players.filter((p) => woke.has(p.id) && p.id !== self.id).map((p) => p.name);
+        return names.length
+          ? `Despiertan por su habilidad esta noche: ${names.join(", ")}. Enseña cuántos de los 2 que elige están en la lista (descuenta a quien no haya llegado a despertar).`
+          : "Esta noche nadie más despierta por su habilidad: enseña 0.";
       }
       case "eviltwin": {
         const twin = game.players.find((p) => p.reminders.some((r) => r.sourceCharacterId === "eviltwin" && r.label === "Gemelo"));

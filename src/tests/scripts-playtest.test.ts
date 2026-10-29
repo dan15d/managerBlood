@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { StaticCharacterCatalog } from "@infrastructure/catalog/StaticCatalog";
 import type { Game, Player } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
-import { infoHints } from "@domain/services/NightInfo";
+import { choiceReminder, infoHints } from "@domain/services/NightInfo";
 import { buildNightOrder } from "@domain/services/NightOrder";
 import { seededRandom } from "@domain/services/Random";
 import { applySetupEffects } from "@domain/services/SetupGenerator";
@@ -110,6 +110,118 @@ describe("Bad Moon Rising", () => {
     const drunk = game(["drunk", "imp", "poisoner", "chef", "empath"]);
     drunk.players[0].shownCharacterId = "monk";
     expect(buildNightOrder(drunk, map).map((s) => s.key)).toContain("char:monk");
+  });
+});
+
+describe("Habilidades de Bad Moon Rising y Sects & Violets", () => {
+  it("un Demonio borracho o envenenado no mata (también el Diablillo del Marinero)", () => {
+    const g = rules.addReminder(game(["imp", "sailor", "poisoner", "chef", "empath"]), "p0", r("sailor", "Borracho"));
+    const result = choose(g, "p3", "imp", "Muerto");
+    expect(alive(result.game, "p3")).toBe(true);
+    expect(result.message).toContain("borracho o envenenado");
+  });
+
+  it("Matón: el primero que le elige queda borracho y el Matón pasa a su bando; el segundo, no", () => {
+    const g = game(["imp", "goon", "poisoner", "chef", "empath"]);
+    const first = choose(g, "p1", "imp", "Muerto");
+    expect(alive(first.game, "p1")).toBe(true);
+    expect(first.game.players[1].alignment).toBe("evil");
+    expect(first.game.players[0].reminders.some((x) => x.sourceCharacterId === "goon" && x.label === "Borracho")).toBe(true);
+    expect(first.message).toContain("es el Matón");
+    // Ya ha elegido alguien esta noche: el Envenenador le envenena sin más.
+    const second = choose(first.game, "p1", "poisoner", "Envenenado");
+    expect(second.game.players[2].reminders.some((x) => x.sourceCharacterId === "goon")).toBe(false);
+  });
+
+  it("Profesor: resucita a un Aldeano muerto, una vez", () => {
+    let g = rules.killPlayer(rules.killPlayer(game(["professor", "imp", "poisoner", "chef", "empath"]), "p3"), "p2");
+    expect(choose(g, "p2", "professor", "Vivo").message).toContain("no es Aldeano");
+    const revived = choose(g, "p3", "professor", "Vivo");
+    expect(alive(revived.game, "p3")).toBe(true);
+    g = rules.killPlayer(revived.game, "p4");
+    expect(alive(choose(g, "p4", "professor", "Vivo").game, "p4")).toBe(false);
+  });
+
+  it("Niña de la Luna: su elegido muere si es bueno, y su paso no se salta por estar muerta", () => {
+    let g = rules.killPlayer(game(["moonchild", "imp", "poisoner", "chef", "empath"]), "p0");
+    expect(buildNightOrder(g, map).find((s) => s.key === "char:moonchild")?.dead).toBe(false);
+    expect(alive(choose(g, "p2", "moonchild", "Muerto").game, "p2")).toBe(true);
+    g = choose(g, "p3", "moonchild", "Muerto").game;
+    expect(alive(g, "p3")).toBe(false);
+    expect(buildNightOrder(g, map).find((s) => s.key === "char:moonchild")?.dead).toBe(true);
+  });
+
+  it("Juglar: si se ejecuta a un Esbirro, todos los demás están borrachos hasta el crepúsculo de mañana", () => {
+    let g = game(["minstrel", "imp", "poisoner", "chef", "empath"], { phase: { kind: "day", number: 1 } });
+    g = rules.execute(g, "p2", map);
+    const drunk = (x: Game) => x.players.filter((p) => p.reminders.some((r) => r.sourceCharacterId === "minstrel")).map((p) => p.id);
+    expect(drunk(g)).toEqual(["p1", "p2", "p3", "p4"]);
+    // Ese crepúsculo aún no caduca.
+    expect(rules.expiringReminders(g).some((e) => e.reminder.sourceCharacterId === "minstrel")).toBe(false);
+    g = rules.startNight(g);
+    expect(infoHints(g, catalog.get("empath")!, map)[0].caveats.join(" ")).toContain("Juglar");
+    // El Demonio borracho no mata.
+    expect(alive(choose(g, "p3", "imp", "Muerto").game, "p3")).toBe(true);
+    // Al día siguiente caduca en el crepúsculo.
+    g = rules.startDay(g);
+    expect(rules.expiringReminders(g).filter((e) => e.reminder.sourceCharacterId === "minstrel")).toHaveLength(4);
+  });
+
+  it("Cortesano: una sola vez; el Padrino no mata la primera noche", () => {
+    let g = choose(game(["courtier", "imp", "godfather", "chef", "empath"]), "p1", "courtier", "Borracho 1").game;
+    expect(alive(choose(g, "p3", "imp", "Muerto").game, "p3")).toBe(true);
+    expect(choose(g, "p4", "courtier", "Borracho 1").message).toContain("ya usó");
+    expect(choiceReminder("godfather", true)).toBeUndefined();
+    expect(choiceReminder("godfather", false)).toBe("Muerto");
+  });
+
+  it("Filósofo: gana la habilidad elegida, despierta como ese personaje y emborracha a quien lo tiene", () => {
+    const g = game(["philosopher", "imp", "witch", "dreamer", "empath"], { phase: { kind: "night", number: 1 } });
+    const result = rules.philosopherChoose(g, "p0", "dreamer", map);
+    expect(result.game.players[0].characterId).toBe("dreamer");
+    expect(result.game.players[0].alignment).toBe("good");
+    expect(result.game.players[0].reminders.some((x) => x.label === "Es el Filósofo")).toBe(true);
+    expect(result.game.players[3].reminders.some((x) => x.sourceCharacterId === "philosopher" && x.label === "Borracho")).toBe(true);
+    expect(buildNightOrder(result.game, map).find((s) => s.key === "char:dreamer")?.playerIds).toEqual(["p0", "p3"]);
+    expect(() => rules.philosopherChoose(g, "p0", "witch", map)).toThrow();
+  });
+
+  it("Pit-Hag: convierte a un jugador (conserva su bando) salvo en un personaje en juego", () => {
+    const g = game(["pithag", "vortox", "dreamer", "empath", "oracle"]);
+    expect(choose(g, "p2", "pithag", "Elegido").game).toBe(g);
+    expect(rules.pitHagChoose(g, "p2", "empath", map).message).toContain("ya está en juego");
+    const demon = rules.pitHagChoose(g, "p2", "nodashii", map);
+    expect(demon.game.players[2].characterId).toBe("nodashii");
+    expect(demon.game.players[2].alignment).toBe("good");
+    expect(demon.message).toContain("las muertes de esta noche las decides tú");
+    const poisoned = rules.addReminder(g, "p0", r("custom", "Envenenado"));
+    expect(rules.pitHagChoose(poisoned, "p2", "sage", map).game.players[2].characterId).toBe("dreamer");
+    expect(choiceReminder("pithag", true)).toBeUndefined();
+  });
+
+  it("Sirvienta: quién ha despertado esta noche por su habilidad", () => {
+    const g = game(["chambermaid", "imp", "poisoner", "chef", "drunk", "saint"]);
+    g.players[4].shownCharacterId = "monk";
+    const hint = infoHints(g, catalog.get("chambermaid")!, map)[0].text;
+    expect(hint).toContain("J2, J3");
+    expect(hint).not.toContain("J5");
+    expect(hint).not.toContain("J4");
+  });
+
+  it("Vigormortis: el Esbirro que mata conserva su habilidad y sigue despertándose", () => {
+    const g = game(["vigormortis", "chef", "witch", "empath", "oracle"]);
+    const result = choose(g, "p2", "vigormortis", "Muerto");
+    expect(alive(result.game, "p2")).toBe(false);
+    expect(result.message).toContain("conserva su habilidad");
+    expect(result.message).toContain("J2 o J4");
+    expect(buildNightOrder(result.game, map).find((s) => s.key === "char:witch")?.dead).toBe(false);
+  });
+
+  it("Tahúr: al tocar a quién elige, dice su personaje", () => {
+    const g = game(["gambler", "imp", "poisoner", "chef", "empath"]);
+    const result = choose(g, "p3", "gambler", "Elegido");
+    expect(result.message).toContain("J4 es Chef. Si el Tahúr no ha acertado, muere");
+    expect(result.game).toBe(g);
   });
 });
 

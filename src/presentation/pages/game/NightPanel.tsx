@@ -5,6 +5,7 @@ import * as rules from "@domain/services/GameRules";
 import type { NightStep } from "@domain/services/NightOrder";
 import { useState } from "react";
 import { gameCharacterIds } from "@domain/services/SpecialRules";
+import { useApp } from "../../app/AppContext";
 import { CharacterGuide, SpecialCases } from "../../components/CharacterGuide";
 import { CharacterPicker } from "../../components/CharacterPicker";
 import { Sheet } from "../../components/Sheet";
@@ -46,6 +47,8 @@ function StepIcon({ step, size }: { step: NightStep; size: number }) {
 export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, onEditBluffs, onPickReminder, scriptCharacters }: Props) {
   const [card, setCard] = useState<Card | null>(null);
   const [choosing, setChoosing] = useState(false);
+  const [philosophising, setPhilosophising] = useState(false);
+  const { toast } = useApp();
   const [heading, setHeading] = useState<string | undefined>(undefined);
   const index = Math.min(game.nightStep, steps.length - 1);
   const step = steps[index];
@@ -251,6 +254,12 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
             </div>
           </>
         )}
+        {/* El Filósofo elige un personaje bueno: pasa a tener su ficha. */}
+        {step.character?.id === "philosopher" && step.playerIds.length > 0 && (
+          <button className="btn btn--primary btn--block" style={{ marginTop: 8 }} onClick={() => setPhilosophising(true)}>
+            <Pointer /> Elegir personaje…
+          </button>
+        )}
         {step.kind === "character" && (
           <button className="btn btn--block btn--ghost" style={{ marginTop: 6 }} onClick={() => setChoosing(true)}>
             <Eye /> Enseñar un personaje…
@@ -323,6 +332,27 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
               }}
             />
           </div>
+        </Sheet>
+      )}
+
+      {philosophising && (
+        <Sheet onClose={() => setPhilosophising(false)} title="¿Qué personaje elige el Filósofo?" label="Personaje del Filósofo">
+          <CharacterPicker
+            characters={scriptCharacters.filter((c) => c.team === "townsfolk" || c.team === "outsider")}
+            selected={[]}
+            searchable
+            onToggle={(id) => {
+              const philosopherId = step.playerIds[0];
+              let message = "";
+              onChange((g) => {
+                const result = rules.philosopherChoose(g, philosopherId, id, characters);
+                message = result.message;
+                return result.game;
+              });
+              setPhilosophising(false);
+              if (message) toast(message);
+            }}
+          />
         </Sheet>
       )}
 

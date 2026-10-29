@@ -52,6 +52,7 @@ export function GamePage() {
   const [dismissedHint, setDismissedHint] = useState("");
   const [pick, setPick] = useState<Pick | null>(null);
   const [ending, setEnding] = useState(false);
+  const [pitHagTarget, setPitHagTarget] = useState<string | null>(null);
   const characters = app.catalog.map();
   const saving = useRef(Promise.resolve());
   const gameRef = useRef<Game | null>(null);
@@ -154,6 +155,11 @@ export function GamePage() {
       }
       return setPick({ kind: "seat" });
     }
+    if (pick.kind === "reminder" && pick.sourceId === "pithag") {
+      // La Pit-Hag: después de tocar al jugador se elige su nuevo personaje.
+      setPitHagTarget(pid);
+      return setPick(null);
+    }
     if (pick.kind === "reminder") {
       // Pone el recordatorio y aplica lo que provoca (ataque del Demonio, veneno del Pukka…).
       const reminder = { id: app.newId(), sourceCharacterId: pick.sourceId, label: pick.label };
@@ -175,7 +181,9 @@ export function GamePage() {
     }
     if (pick.kind === "execute") {
       change((g) => rules.executeNow(g, pid, undefined, characters));
-      toast(`${name(pid)} es ejecutado.`);
+      // El registro dice si sobrevive (Abogado del diablo, Marinero, Bufón…).
+      const logged = [...(gameRef.current?.log ?? [])].reverse().find((l) => l.text.startsWith(`${name(pid)} es ejecutado`));
+      toast(logged?.text ?? `${name(pid)} es ejecutado.`);
       setPick(null);
       return setTab("phase");
     }
@@ -524,6 +532,28 @@ export function GamePage() {
                 ),
               )
             }
+          />
+        </Sheet>
+      )}
+
+      {pitHagTarget && (
+        <Sheet onClose={() => setPitHagTarget(null)} title={`¿En qué se convierte ${name(pitHagTarget)}?`} label="Personaje nuevo (Pit-Hag)">
+          <p className="muted small">Solo cambia si el personaje no está en juego. Conserva su bando.</p>
+          <CharacterPicker
+            characters={scriptCharacters.filter((c) => c.team !== "traveller" && !game.players.some((p) => p.characterId === c.id))}
+            selected={[]}
+            searchable
+            onToggle={(cid) => {
+              const targetId = pitHagTarget;
+              let message = "";
+              change((g) => {
+                const result = rules.pitHagChoose(g, targetId, cid, characters);
+                message = result.message;
+                return result.game;
+              });
+              setPitHagTarget(null);
+              if (message) toast(message);
+            }}
           />
         </Sheet>
       )}

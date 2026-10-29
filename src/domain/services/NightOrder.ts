@@ -1,6 +1,6 @@
 import type { Character } from "../entities/Character";
 import type { Game, Player } from "../entities/Game";
-import { hasLilMonsta, healthy, reallyAlive } from "./Demons";
+import { has, hasLilMonsta, healthy, reallyAlive } from "./Demons";
 import { TOR, TOYMAKER } from "./SpecialRules";
 
 export type NightStepKind = "dusk" | "minion_info" | "demon_info" | "character" | "dawn";
@@ -32,6 +32,14 @@ function deathNote(game: Game, characterId: string, players: Player[]): NightSte
     return tonight
       ? { wake: true, text: "Ha muerto esta noche: despiértalo para que use su habilidad." }
       : { wake: false, text: "Solo actúa si muere esta noche. Ahora no le despiertes." };
+  }
+  // La Niña de la Luna elige al morir (de día, en público) y esa noche muere su elegido si es bueno.
+  if (characterId === "moonchild") {
+    const dead = players.filter((p) => !p.alive);
+    if (!dead.length) return { wake: false, text: "Solo actúa cuando muere. Ahora no hay nada que hacer." };
+    return dead.some((p) => !has(p, "moonchild", "Sin habilidad"))
+      ? { wake: true, text: "Ha muerto: si ya ha elegido a alguien en público, toca a quién (si es bueno, muere)." }
+      : { wake: false, text: "Ya usó su habilidad." };
   }
   if (ACT_IF_DIED_RECENTLY.has(characterId)) {
     const recently = tonight || players.some((p) => (game.dayDeaths ?? []).includes(p.id));
@@ -159,7 +167,8 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
         deceivedPlayerIds: deceived,
         character: c,
         // Los que actúan al morir se saltan si no les toca, aunque estén vivos.
-        dead: note ? !note.wake : players.length > 0 && players.every((p) => !reallyAlive(p)),
+        // El Esbirro muerto por el Vigormortis conserva su habilidad.
+        dead: note ? !note.wake : players.length > 0 && players.every((p) => !reallyAlive(p) && !has(p, "vigormortis", "Tiene habilidad")),
         deathNote: note,
       },
     });

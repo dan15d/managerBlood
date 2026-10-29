@@ -16,6 +16,21 @@ Se puede instalar en el móvil desde el navegador («Añadir a pantalla de inici
 - Ayudas al Narrador: **Deshacer**, pantalla siempre encendida, la **respuesta verdadera** de los personajes de información (Empático, Chef, Lavandera, Bibliotecario, Investigador, Enterrador, Pitonisa, Relojero, Pregonero, Florista, Oráculo, Shugenja, Caballero, Noble, Administrador, Abuela, Sabio, Rey, Niño del coro, Cazarrecompensas, Padrino; y el Soñador, el Guardián de cuervos y el Tonto del pueblo al tocar a quién eligen), «Toca a quién elige» para poner el recordatorio de un toque (las fichas se mueven como en el Grimorio físico; el ataque del Demonio mata en el acto salvo protección, igual que el **Asesino** (aunque haya protección) y el **Padrino**, y los móviles lo ven al amanecer) y, al anochecer, quitar los recordatorios que ya no valen. Si muere el Demonio y la partida sigue (la Mujer escarlata con 5 o más vivos, o el pase del Diablillo a un Esbirro), lo avisa en vez de dar la victoria al Bien y lo convierte de un toque.
 - Botón **Terminar** para declarar quién gana en cualquier momento. Victorias que avisa sola: el **Santo** ejecutado, el **Alcalde** con 3 vivos y sin ejecución. La **Virgen** ejecuta en el acto al Aldeano que la nomina, el **Exterminador** dispara de un toque (sin que cuente como ejecución) y hay **ejecución sin votación** (Juez, Visir…). Los que actúan al morir (**Guardián de cuervos**, Sabio, Granjero, Banshee…) solo se despiertan si les toca, y los votos del **Burócrata** (×3) y el **Ladrón** (−1) cuentan con su peso.
 - Otras ediciones: **exilio de Viajeros** (votan todos, sin gastar voto, mitad de todos los jugadores); **Gemela malvada**, **Mente maestra** (día extra) y **Hereje** (invierte el ganador) en los avisos de victoria; el **Marinero**, el **Bufón** y el elegido del **Abogado del diablo** sobreviven; la **Abuela** muere con su nieto; el **Cultivador de opio** retrasa la información del Mal; el **Carnicero** nomina tras la ejecución; la **Banshee** nomina y vota dos veces; y con el **Voudon** solo votan él y los muertos. El **Encantador de serpientes** que elige al Demonio intercambia personaje y bando de un toque (el antiguo Demonio queda envenenado), y desde la ficha del jugador se puede **intercambiar personaje** con otro (Barbero, sin cambiar de bando). En las votaciones, el voto del **Mayordomo** sin su señor no cuenta y se marca al **Fanático** que debe votar; al nominar, el maldito de la **Bruja** muere y el **Gólem** mata a su nominado si no es el Demonio; y el **Fearmonger** que nomina y ejecuta a su elegido hace perder a su equipo.
+- Más habilidades de Bad Moon Rising y Sects & Violets que aplica la app:
+  - **Personajes que cambian quién es quién:**
+    - El **Filósofo** elige personaje y pasa a despertar como él, y quien lo tenía queda borracho.
+    - La **Pit-Hag** convierte a un jugador en otro personaje, que conserva su bando.
+  - **Borracheras:**
+    - Un Demonio borracho o envenenado no mata.
+    - El **Matón** emborracha al primero que le elige y pasa a su bando.
+    - El **Juglar** emborracha a todos tras ejecutar a un Esbirro.
+    - El **Cortesano** solo actúa una vez.
+  - **Muertes y resurrecciones:**
+    - El **Profesor** resucita a un Aldeano.
+    - La **Niña de la Luna** mata a su elegido si es bueno.
+    - El Esbirro que mata el **Vigormortis** conserva su habilidad.
+  - **Información para el Narrador:**
+    - El **Tahúr** y la **Sirvienta** reciben su respuesta.
 - Demonios con reglas propias: el **Pukka** mata a su víctima anterior al envenenar a otra; el **Fang Gu** salta al primer Forastero; el **Zombuul** parece muerto la primera vez y solo ataca si nadie ha muerto ese día; el **Lleech** envenena a su huésped y no muere mientras viva; **Lil' Monsta** no va en la bolsa (lo cuida un Esbirro); el **Vortox** y el **Leviatán** avisan de la victoria del Mal; el **Shabaloth** regurgita; y el **No Dashii** envenena a sus Aldeanos vecinos desde el principio.
 - Para el jugador: **mantener pulsada la ficha** para ver su personaje (se oculta al soltar, al salir de la app o al minuto) y **notas privadas** sobre los demás (qué dicen ser y qué cree que son), guardadas solo en su móvil.
 - «Repartir»: se pasa el móvil y cada jugador ve su personaje en secreto.
