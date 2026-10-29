@@ -12,7 +12,7 @@ import { INFO_HEADINGS, ShowCard } from "../../components/ShowCard";
 import { Token } from "../../components/Token";
 import { NIGHT_ICONS } from "../../wikiAssets";
 import { ChevronLeft, ChevronRight, Eye, Lightbulb, Pointer, Skull, Sun, TriangleAlert, VenetianMask } from "lucide-react";
-import { choiceReminder, infoHints } from "@domain/services/NightInfo";
+import { choiceReminder, infoHints, SWAPS_ON_CHOICE } from "@domain/services/NightInfo";
 
 interface Props {
   game: Game;
@@ -158,7 +158,7 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
         {/* Quien elige a alguien (Envenenador, Monje, Demonio…): un toque y se pone su recordatorio. */}
         {chooser && (
           <button className="btn btn--primary btn--block" style={{ marginTop: 8 }} onClick={() => onPickReminder(step.character!.id, chooser)}>
-            <Pointer /> Toca a quién elige · «{chooser}»
+            <Pointer /> Toca a quién elige{SWAPS_ON_CHOICE.has(step.character!.id) ? "" : ` · «${chooser}»`}
           </button>
         )}
 

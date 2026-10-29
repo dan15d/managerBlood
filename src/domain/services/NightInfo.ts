@@ -58,7 +58,11 @@ export const CHOICE_REMINDER: Record<string, string> = {
   alhadikhia: "1",
   bureaucrat: "3 votos",
   thief: "Voto negativo",
+  snakecharmer: "Envenenado",
 };
+
+/** Quien al elegir no pone recordatorio sino que intercambia personajes (el botón no lo nombra). */
+export const SWAPS_ON_CHOICE = new Set(["snakecharmer"]);
 
 /** Lo que pone quien elige esta noche: el Lleech, la primera noche, envenena a su huésped. */
 export const choiceReminder = (characterId: string, firstNight: boolean): string | undefined =>

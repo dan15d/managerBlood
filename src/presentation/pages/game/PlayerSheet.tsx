@@ -265,6 +265,23 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
                     ))}
                 </select>
               </label>
+              <label className="field">
+                <span>Intercambiar personaje con (Barbero: cada uno conserva su bando)</span>
+                <select
+                  className="input"
+                  value=""
+                  onChange={(e) => e.target.value && onChange((g) => rules.swapCharacters(g, player.id, e.target.value, characters))}
+                >
+                  <option value="">— Elige jugador —</option>
+                  {game.players
+                    .filter((p) => p.id !== player.id)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.seat + 1}. {p.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
             </div>
           </details>
 

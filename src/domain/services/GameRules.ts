@@ -117,6 +117,47 @@ export function setCharacter(game: Game, playerId: string, character: Character,
   );
 }
 
+/**
+ * Dos jugadores intercambian personajes (con lo que cree ser cada uno). El Encantador de
+ * serpientes intercambia también el bando; el Barbero, no.
+ */
+export function swapCharacters(game: Game, aId: string, bId: string, characters: Map<string, Character>, swapAlignment = false): Game {
+  const a = findPlayer(game, aId);
+  const b = findPlayer(game, bId);
+  if (!a || !b) throw new RuleViolation("Ese jugador no está en la partida.");
+  if (a.id === b.id) throw new RuleViolation("Elige a otro jugador.");
+  const take = (p: Player, from: Player): Player => ({
+    ...p,
+    characterId: from.characterId,
+    shownCharacterId: from.shownCharacterId,
+    alignment: swapAlignment ? from.alignment : p.alignment,
+  });
+  const name = (p: Player) => characters.get(p.characterId)?.name ?? p.characterId;
+  return touch(
+    { ...game, players: game.players.map((p) => (p.id === a.id ? take(p, b) : p.id === b.id ? take(p, a) : p)) },
+    `${a.name} y ${b.name} intercambian personajes${swapAlignment ? " y bandos" : ""}: ${a.name} pasa a ser ${name(b)} y ${b.name}, ${name(a)}.`,
+  );
+}
+
+/**
+ * El Encantador de serpientes elige a alguien: si es el Demonio (y el Encantador está en juego
+ * y sano), intercambian personajes y bandos, y el antiguo Demonio queda envenenado para siempre.
+ */
+export function snakeCharmerChoose(game: Game, targetId: string, characters: Map<string, Character>): { game: Game; message: string } {
+  const target = findPlayer(game, targetId);
+  if (!target) throw new RuleViolation("Ese jugador no está en la partida.");
+  const charmer = game.players.find((p) => p.characterId === "snakecharmer" && p.alive && healthy(p));
+  if (!charmer) return { game, message: "El Encantador de serpientes no tiene habilidad esta noche (no está en juego, está borracho o envenenado): no hay intercambio." };
+  if (characters.get(target.characterId)?.team !== "demon" || !reallyAlive(target)) {
+    return { game, message: `${target.name} no es el Demonio: no pasa nada.` };
+  }
+  const swapped = swapCharacters(game, charmer.id, target.id, characters, true);
+  return {
+    game: withReminder(swapped, target.id, "snakecharmer", "Envenenado"),
+    message: `${charmer.name} ha elegido al Demonio: ahora ${charmer.name} es el Demonio (malo) y ${target.name} el Encantador (bueno y envenenado). Despiértalos y enséñales TÚ ERES y su nuevo personaje.`,
+  };
+}
+
 export const setAlignment = (game: Game, playerId: string, alignment: Alignment): Game =>
   touch(updatePlayer(game, playerId, (p) => ({ ...p, alignment })));
 
@@ -719,6 +760,9 @@ export function applyReminderChoice(
   if (!target) throw new RuleViolation("Ese jugador no está en la partida.");
   const copies = reminderCopies(reminder, characters);
   const night = game.phase.kind === "night";
+
+  // El Encantador de serpientes no pone recordatorio: si elige al Demonio, intercambian.
+  if (night && reminder.sourceCharacterId === "snakecharmer") return snakeCharmerChoose(game, targetId, characters);
 
   if (night && reminder.sourceCharacterId === "pukka" && reminder.label === "Envenenado") {
     const r = pukkaChoose(game, targetId, reminder);
