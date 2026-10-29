@@ -1,6 +1,7 @@
 import type { Alignment, Character } from "../entities/Character";
 import type { Game, Nomination, Phase, Player, ReminderToken } from "../entities/Game";
 import { RuleViolation } from "../errors";
+import { aliveNeighbours } from "./NightInfo";
 import {
   demonPlayers,
   has,
@@ -178,7 +179,6 @@ export const DUSK_REMINDERS = new Set([
   "harpy:Segundo jugador",
   "lunatic:Elegido",
   "minstrel:Todos están borrachos",
-  "princess:No mata",
   "acrobat:Elegido",
   "flowergirl:Demonio ha votado",
   "flowergirl:Demonio no ha votado",
@@ -240,6 +240,8 @@ export function startDay(game: Game): Game {
     nightDeaths: [],
     dayDeaths: [],
     butcherNominationId: undefined,
+    // El «No mata» de la Princesa solo valía la noche que acaba.
+    players: game.players.map((p) => ({ ...p, reminders: p.reminders.filter((r) => !(r.sourceCharacterId === "princess" && r.label === "No mata")) })),
   };
   return touch(next, died.length ? `Amanece. Han muerto esta noche: ${died.join(", ")}.` : "Amanece. Nadie ha muerto esta noche.");
 }
@@ -421,11 +423,15 @@ export function onTheBlock(game: Game): { playerId: string; votes: number } | nu
   return tied ? null : best;
 }
 
-/** Quien sobrevive a ser ejecutado: el elegido por el Abogado del diablo, el Marinero sano y el Bufón (una vez). */
-function survivesExecution(player: Player): string | null {
-  if (has(player, "devilsadvocate", "Sobrevive ejecución")) return "el Abogado del diablo le protege";
+/**
+ * Quien sobrevive a ser ejecutado: el elegido por el Abogado del diablo (sano), el Marinero sano,
+ * el Bufón (una vez) y los vecinos buenos de la Dama del té.
+ */
+function survivesExecution(game: Game, player: Player): string | null {
+  if (has(player, "devilsadvocate", "Sobrevive ejecución") && protectionWorks(game, "devilsadvocate")) return "el Abogado del diablo le protege";
   if (player.characterId === "sailor" && healthy(player)) return "el Marinero no puede morir";
   if (player.characterId === "fool" && healthy(player)) return "el Bufón no muere la primera vez";
+  if (teaLadyProtects(game, player)) return "la Dama del té protege a sus vecinos buenos";
   return null;
 }
 
@@ -442,7 +448,7 @@ export function execute(game: Game, playerId: string, characters?: Map<string, C
   const player = findPlayer(game, playerId);
   if (!player) throw new RuleViolation("Ese jugador no está en la partida.");
 
-  const survives = player.alive ? survivesExecution(player) : null;
+  const survives = player.alive ? survivesExecution(game, player) : null;
   let after: Game;
   if (survives) {
     after = touch(game, `${player.name} es ejecutado, pero sigue vivo (${survives}).`);
@@ -455,6 +461,10 @@ export function execute(game: Game, playerId: string, characters?: Map<string, C
   // El Leviatán cuenta los buenos ejecutados: con el segundo, gana el Mal.
   const leviathan = after.players.some((p) => p.characterId === "leviathan" && reallyAlive(p));
   if (leviathan && player.alignment === "good") after = withReminder(after, playerId, "leviathan", LEVIATHAN_GOOD_EXECUTED);
+  // Princesa: si en su primer día nomina y se ejecuta a ese jugador, el Demonio no mata esta noche.
+  const princessNomination = game.nominations.find((n) => !n.exile && n.nomineeId === playerId && findPlayer(game, n.nominatorId)?.characterId === "princess");
+  const princess = princessNomination && findPlayer(game, princessNomination.nominatorId);
+  if (princess && healthy(princess) && game.phase.number === 1) after = withReminder(after, princess.id, "princess", "No mata");
   // Mente maestra: el Demonio ejecutado no acaba la partida; se juega un día más.
   if (characters && !game.mastermindDay) {
     const mastermind = after.players.find((p) => p.characterId === "mastermind" && p.alive && healthy(p));
@@ -575,12 +585,44 @@ const PROTECTION = /^(a salvo|protegido|no puede morir)$/i;
 export const isDemonKill = (reminder: Pick<ReminderToken, "sourceCharacterId" | "label">, characters: Map<string, Character>) =>
   reminder.label === "Muerto" && characters.get(reminder.sourceCharacterId)?.team === "demon";
 
-export type DemonKillOutcome = "killed" | "protected" | "selfKill" | "mayor" | "jump" | "fool" | "banshee";
+export type DemonKillOutcome = "killed" | "protected" | "selfKill" | "mayor" | "jump" | "fool" | "banshee" | "blocked" | "alreadyDead";
 
-/** No muere por el Demonio: Soldado o Marinero sanos, o con «A salvo», «Protegido», «No puede morir». */
-const isProtected = (target: Player) =>
+/**
+ * Un recordatorio de protección solo vale si quien lo pone está de verdad en juego y sano: el
+ * «A salvo» de un Monje que es el Borracho, o de un Monje envenenado, no protege. Los propios del
+ * Narrador («custom») siempre valen.
+ */
+const protectionWorks = (game: Game, source: string) =>
+  source === "custom" || game.players.some((p) => p.characterId === source && healthy(p));
+
+/** Vecino vivo de una Dama del té viva y sana cuyos dos vecinos vivos son buenos. */
+const teaLadyProtects = (game: Game, target: Player) =>
+  game.players.some((lady) => {
+    if (lady.characterId !== "tealady" || !lady.alive || !healthy(lady)) return false;
+    const neighbours = aliveNeighbours(game, lady);
+    return neighbours.some((n) => n.id === target.id) && neighbours.every((n) => n.alignment === "good");
+  });
+
+/**
+ * No muere: Soldado o Marinero sanos, vecinos buenos de la Dama del té, o con «A salvo»,
+ * «Protegido» o «No puede morir» de alguien cuya habilidad funciona.
+ */
+const isProtected = (game: Game, target: Player) =>
   ((target.characterId === "soldier" || target.characterId === "sailor") && healthy(target)) ||
-  target.reminders.some((r) => PROTECTION.test(r.label));
+  teaLadyProtects(game, target) ||
+  target.reminders.some((r) => PROTECTION.test(r.label) && protectionWorks(game, r.sourceCharacterId));
+
+/**
+ * Por qué el Demonio no mata esta noche: el Exorcista le ha elegido o la Princesa ejecutó en su
+ * primer día. Devuelve el aviso, o null si mata con normalidad.
+ */
+export function demonBlocked(game: Game, demonCharacterId: string): string | null {
+  const exorcist = game.players.some((p) => p.characterId === "exorcist" && healthy(p));
+  const chosen = game.players.some((p) => p.characterId === demonCharacterId && has(p, "exorcist", "Elegido"));
+  if (exorcist && chosen) return "El Exorcista ha elegido al Demonio: esta noche no se despierta ni mata.";
+  if (game.players.some((p) => has(p, "princess", "No mata"))) return "La Princesa ejecutó en su primer día: el Demonio no mata esta noche.";
+  return null;
+}
 
 /** El Bufón sano que aún no ha usado su habilidad sobrevive a su primera muerte. */
 const foolSurvives = (p: Player) => p.characterId === "fool" && healthy(p);
@@ -600,7 +642,9 @@ export function demonKill(
 ): { game: Game; outcome: DemonKillOutcome } {
   const target = findPlayer(game, targetId);
   if (!target) throw new RuleViolation("Ese jugador no está en la partida.");
-  if (isProtected(target)) return { game, outcome: "protected" };
+  if (!target.alive && !zombuulSeemsDead(target)) return { game: placeReminder(game, targetId, reminder, copies), outcome: "alreadyDead" };
+  if (demonBlocked(game, reminder.sourceCharacterId)) return { game, outcome: "blocked" };
+  if (isProtected(game, target)) return { game, outcome: "protected" };
   const demonCharacter = characters.get(reminder.sourceCharacterId);
   const demon = demonCharacter?.name ?? "el Demonio";
 
@@ -608,7 +652,7 @@ export function demonKill(
     const jumped = game.players.some((p) => p.reminders.some((r) => r.sourceCharacterId === "fanggu" && r.label === "Primera vez"));
     const fangGu = game.players.find((p) => p.characterId === "fanggu" && p.alive);
     // Un Fang Gu protegido no salta: el Forastero muere sin más.
-    if (!jumped && fangGu && !isProtected(fangGu) && demonCharacter) {
+    if (!jumped && fangGu && !isProtected(game, fangGu) && demonCharacter) {
       let next = killPlayer(game, fangGu.id, `muere: salta a ${target.name}`);
       next = setCharacter(next, targetId, demonCharacter);
       next = withReminder(next, targetId, "fanggu", "Primera vez");
@@ -647,7 +691,7 @@ export function pukkaChoose(game: Game, targetId: string, reminder: ReminderToke
     // Deja de estar envenenado: muere (si no está protegido) y después está sano.
     next = updatePlayer(next, p.id, (x) => ({ ...x, reminders: x.reminders.filter((r) => !isPukkaPoison(r)) }));
     if (!p.alive) continue;
-    if (isProtected(p)) saved.push(p);
+    if (isProtected(game, p)) saved.push(p);
     else {
       next = killPlayer(next, p.id, "muere por el veneno del Pukka");
       died.push(p);
@@ -696,6 +740,8 @@ export function applyReminderChoice(
     const { game: next, outcome } = demonKill(game, targetId, reminder, copies, characters);
     const demon = characters.get(reminder.sourceCharacterId)?.name ?? "el Demonio";
     const message = {
+      alreadyDead: `${target.name} ya estaba muerto: el ataque no cambia nada.`,
+      blocked: demonBlocked(game, reminder.sourceCharacterId) ?? "El Demonio no mata esta noche.",
       protected: `${target.name} está a salvo y no muere. Si la protección no funciona (borracho, envenenado…), márcalo muerto en el Amanecer.`,
       selfKill: `${target.name} se ha elegido a sí mismo y muere: elige arriba quién es el nuevo Demonio.`,
       mayor: `${target.name} es el Alcalde: puede morir otro en su lugar. Si lo decides, deshaz y elige a ese jugador.`,

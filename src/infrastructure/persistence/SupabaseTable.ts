@@ -188,7 +188,7 @@ export class SupabaseTablePublisher implements TablePublisher {
       fabled_ids: game.fabledIds ?? [],
     };
     const seats = game.players.map((p) => {
-      const secret = seatSecret(p, characters, game.fabledIds);
+      const secret = seatSecret(p, characters, game.fabledIds, publicAlive(game, p));
       return {
         id: p.id,
         game_id: game.id,

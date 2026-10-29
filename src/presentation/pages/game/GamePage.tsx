@@ -1,7 +1,7 @@
 import type { Character } from "@domain/entities/Character";
 import type { Game } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
-import { buildNightOrder } from "@domain/services/NightOrder";
+import { buildNightOrder, keepNightStep } from "@domain/services/NightOrder";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../../app/AppContext";
@@ -97,6 +97,8 @@ export function GamePage() {
         return;
       }
       if (next === current) return;
+      // Si la hoja de noche cambia (pase del Diablillo, Cultivador de opio…), se sigue en el mismo paso.
+      next = keepNightStep(current, next, characters);
       // Moverse por la hoja de noche no se deshace: solo lo que cambia el Grimorio.
       if (!onlyNavigation(current, next)) {
         history.current = [...history.current.slice(-(UNDO_LIMIT - 1)), current];
@@ -104,7 +106,7 @@ export function GamePage() {
       }
       persist(next);
     },
-    [persist, toast],
+    [persist, toast, characters],
   );
 
   const undo = useCallback(() => {

@@ -331,7 +331,7 @@ describe("ayudas del Narrador", () => {
     expect(hint(night(), "librarian")[0].text).toContain("0");
     const g = { ...night({ phase: { kind: "night", number: 2 } }), executedToday: "p5" };
     expect(hint(g, "undertaker")).toEqual([]);
-    const withUndertaker = game(["undertaker", "chef", "poisoner", "imp", "empath"], { executedToday: "p1" });
+    const withUndertaker = rules.startNight(rules.execute(game(["undertaker", "chef", "poisoner", "imp", "empath"]), "p1"));
     expect(hint(withUndertaker, "undertaker")[0].text).toContain("Chef");
   });
 

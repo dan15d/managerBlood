@@ -1,7 +1,7 @@
 import type { Game, Player } from "@domain/entities/Game";
 import { TEAM_LABEL } from "@domain/entities/Character";
 import { hasFabled, TOR } from "@domain/services/SpecialRules";
-import { seatSecret } from "@domain/services/TableView";
+import { publicAlive, seatSecret } from "@domain/services/TableView";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
@@ -27,8 +27,8 @@ export function RevealPage() {
   if (!game) return <main className="page page--flow muted">Cargando…</main>;
 
   if (current) {
-    const secret = seatSecret(current, app.catalog.map(), game.fabledIds);
-    const tor = hasFabled(game, TOR) && current.alive;
+    const secret = seatSecret(current, app.catalog.map(), game.fabledIds, publicAlive(game, current));
+    const tor = hasFabled(game, TOR) && publicAlive(game, current);
     const character = secret.characterId ? app.catalog.get(secret.characterId) : undefined;
     const done = () => {
       setSeen((s) => [...new Set([...s, current.id])]);

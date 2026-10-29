@@ -1,5 +1,6 @@
 import type { Character } from "../entities/Character";
 import type { Game, Player } from "../entities/Game";
+import { demonPlayers } from "./Demons";
 
 // La respuesta verdadera de los personajes de información, calculada con el Grimorio.
 // Es una ayuda: el Narrador decide si la da (o da otra si está borracho, envenenado…).
@@ -144,10 +145,14 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
       }
       case "undertaker": {
         const executed = game.players.find((p) => p.id === game.executedToday);
-        return executed ? `Enséñale ${characters.get(executed.characterId)?.name} (ejecutado: ${executed.name}).` : "Hoy no ha habido ejecución: no le despiertes.";
+        if (!executed) return "Hoy no ha habido ejecución: no le despiertes.";
+        // Solo aprende al que ha muerto por la ejecución (no al Marinero o al Bufón que sobreviven).
+        if (!(game.dayDeaths ?? []).includes(executed.id)) return `${executed.name} fue ejecutado pero no murió: no le despiertes.`;
+        return `Enséñale ${characters.get(executed.characterId)?.name} (ejecutado: ${executed.name}).`;
       }
       case "fortuneteller": {
-        const demons = game.players.filter((p) => team(p) === "demon");
+        // Quien cuida a Lil' Monsta también es el Demonio para la Pitonisa.
+        const demons = demonPlayers(game, characters);
         const herring = game.players.find((p) => p.reminders.some((r) => r.sourceCharacterId === "fortuneteller"));
         const yes = [...demons, ...(herring ? [herring] : [])].map((p) => `${p.seat + 1}. ${p.name}`);
         return `Responde SÍ si elige a ${yes.join(" o ")}${herring ? " (pista falsa incluida)" : ""}.${herring ? "" : " Falta poner la pista falsa en un jugador bueno."}`;

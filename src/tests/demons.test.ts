@@ -69,7 +69,8 @@ describe("Pukka", () => {
 
   it("si la víctima anterior está protegida, no muere y queda sana", () => {
     let g = choose(night(game(ids), 1), "p2", "pukka", "Envenenado").game;
-    g = rules.addReminder(night(g, 2), "p2", reminder("innkeeper", "A salvo"));
+    // El Monje está en juego y sano: su «A salvo» protege.
+    g = rules.addReminder(night(g, 2), "p2", reminder("monk", "A salvo"));
     const result = choose(g, "p3", "pukka", "Envenenado");
     expect(result.game.players[2].alive).toBe(true);
     expect(result.game.players[2].reminders.some((r) => r.sourceCharacterId === "pukka")).toBe(false);

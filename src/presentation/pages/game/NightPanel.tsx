@@ -54,6 +54,8 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
   // Jugadores de este paso con un recordatorio que les quita la habilidad (envenenado, borracho…).
   const disabled = step.playerIds.map(player).filter((p) => p.reminders.some((r) => DISABLING.test(r.label)));
   const hints = step.character ? infoHints(game, step.character, characters) : [];
+  // El Exorcista o la Princesa impiden que el Demonio mate esta noche.
+  const demonBlock = step.character?.team === "demon" ? rules.demonBlocked(game, step.character.id) : null;
   // Recordatorio de quien elige jugador cada noche (Envenenador, Monje, Demonio…).
   const chooser = step.character && step.playerIds.length > 0 ? choiceReminder(step.character.id, game.phase.number === 1) : undefined;
   const otherReminders = [...new Set(step.character?.reminders ?? [])].filter((label) => label !== chooser);
@@ -126,6 +128,12 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
             <span className="small muted">Habilidad · </span>
             {step.character.ability}
           </p>
+        )}
+
+        {demonBlock && (
+          <div className="alert alert--warning small">
+            <TriangleAlert /> {demonBlock}
+          </div>
         )}
 
         {hints.length > 0 && (

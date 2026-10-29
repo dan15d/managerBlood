@@ -58,6 +58,22 @@ export const hasEvilInfo = (playerCount: number, fabledIds: string[] = []) =>
 
 const nightNumber = (game: Game) => (game.phase.kind === "night" ? game.phase.number : game.phase.number + 1);
 
+/**
+ * Si la hoja cambia en mitad de la noche (alguien cambia de personaje, aparece la información
+ * del Cultivador de opio…), el Narrador sigue en el mismo paso: se busca por su clave y no por
+ * su posición. Si el cambio era moverse por la hoja, se respeta.
+ */
+export function keepNightStep(before: Game, after: Game, characters: Map<string, Character>): Game {
+  if (before.phase.kind !== "night" || after.phase.kind !== "night" || before.phase.number !== after.phase.number) return after;
+  if (after.nightStep !== before.nightStep) return after;
+  const oldSteps = buildNightOrder(before, characters);
+  const key = oldSteps[Math.min(before.nightStep, oldSteps.length - 1)]?.key;
+  const newSteps = buildNightOrder(after, characters);
+  if (!key || newSteps[after.nightStep]?.key === key) return after;
+  const index = newSteps.findIndex((s) => s.key === key);
+  return index >= 0 ? { ...after, nightStep: index } : after;
+}
+
 export function buildNightOrder(game: Game, characters: Map<string, Character>): NightStep[] {
   const first = nightNumber(game) === 1;
   const steps: { order: number; step: NightStep }[] = [];

@@ -9,14 +9,16 @@ import { TOR } from "./SpecialRules";
 /**
  * Lo que se enseña a cada jugador de sí mismo: el personaje que cree ser y su bando aparente.
  * El Borracho, el Lunático y la Marioneta nunca ven su personaje real: si aún no tienen uno
- * falso asignado, no se les enseña nada. Con Tor nadie sabe quién es hasta que muere.
+ * falso asignado, no se les enseña nada. Con Tor nadie sabe quién es hasta que muere, y una
+ * muerte de noche no se sabe hasta el amanecer (`publiclyAlive`).
  */
 export function seatSecret(
   player: Player,
   characters: Map<string, Character>,
   fabledIds: string[] = [],
+  publiclyAlive = player.alive,
 ): { characterId?: string; alignment?: Alignment } {
-  if (fabledIds.includes(TOR) && player.alive) return {};
+  if (fabledIds.includes(TOR) && publiclyAlive) return {};
   const shown = player.shownCharacterId && characters.get(player.shownCharacterId);
   if (shown) return { characterId: shown.id, alignment: defaultAlignment(shown.team) };
   if (DECOYS[player.characterId]) return {};
