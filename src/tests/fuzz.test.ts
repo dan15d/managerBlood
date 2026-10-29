@@ -93,10 +93,11 @@ function invariants(g: Game, where: string): string[] {
   if (new Set(g.nightDeaths ?? []).size !== (g.nightDeaths ?? []).length) problems.push(`${where}: muerte de noche repetida`);
   for (const id of deaths) if (!g.players.some((p) => p.id === id)) problems.push(`${where}: muerte de un jugador que no existe`);
   if (g.phase.kind === "day" && (g.nightDeaths ?? []).length) problems.push(`${where}: de día quedan muertes de noche sin anunciar`);
-  // La mesa nunca ve muerto a alguien vivo.
+  // La mesa nunca ve muerto a alguien vivo (salvo quien ha resucitado esta noche, hasta el amanecer).
   const pub = publicPlayers(g, map);
+  if (g.phase.kind === "day" && (g.nightRevivals ?? []).length) problems.push(`${where}: de día quedan resurrecciones sin anunciar`);
   g.players.forEach((p, i) => {
-    if (p.alive && !pub[i].alive) problems.push(`${where}: la mesa ve muerto a ${p.name}, que está vivo`);
+    if (p.alive && !pub[i].alive && !(g.nightRevivals ?? []).includes(p.id)) problems.push(`${where}: la mesa ve muerto a ${p.name}, que está vivo`);
     seatSecret(p, map, g.fabledIds, pub[i].alive);
   });
   // Las ayudas de la noche no fallan ni dicen «undefined».

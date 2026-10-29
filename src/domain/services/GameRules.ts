@@ -43,11 +43,15 @@ export const alivePlayers = (game: Game) => game.players.filter((p) => p.alive);
 
 // ---------- Vida y muerte ----------
 
-/** Apunta la muerte: de noche no se anuncia hasta el amanecer; de día cuenta para el Zombuul. */
-const recordDeath = (game: Game, playerId: string): Game =>
-  game.phase.kind === "night"
-    ? { ...game, nightDeaths: [...(game.nightDeaths ?? []), playerId] }
-    : { ...game, dayDeaths: [...(game.dayDeaths ?? []), playerId] };
+/**
+ * Apunta la muerte: de noche no se anuncia hasta el amanecer; de día cuenta para el Zombuul. Si
+ * había resucitado esta misma noche, para la mesa nunca dejó de estar muerto.
+ */
+const recordDeath = (game: Game, playerId: string): Game => {
+  if (game.phase.kind !== "night") return { ...game, dayDeaths: [...(game.dayDeaths ?? []), playerId] };
+  if (game.nightRevivals?.includes(playerId)) return { ...game, nightRevivals: game.nightRevivals.filter((id) => id !== playerId) };
+  return { ...game, nightDeaths: [...(game.nightDeaths ?? []), playerId] };
+};
 
 const withReminder = (game: Game, playerId: string, source: string, label: string): Game =>
   updatePlayer(game, playerId, (p) => ({ ...p, reminders: [...p.reminders, reminderFrom(source, label, `${playerId}:${source}:${label}`)] }));
@@ -90,18 +94,31 @@ export function killPlayer(game: Game, playerId: string, cause = "ha muerto"): G
   return next;
 }
 
+/**
+ * Un jugador vuelve a la vida. De noche (Profesor, Shabaloth…) la mesa no lo ve hasta el amanecer,
+ * salvo que hubiera muerto esa misma noche: entonces, para la mesa, no ha pasado nada.
+ */
 export function revivePlayer(game: Game, playerId: string): Game {
   const player = findPlayer(game, playerId);
   if (!player || player.alive) return game;
+  const night = game.phase.kind === "night";
+  const diedTonight = (game.nightDeaths ?? []).includes(playerId);
+  const hidden = night && !diedTonight;
   const alive = updatePlayer(game, playerId, (p) => ({
     ...p,
     alive: true,
-    ghostVoteUsed: false,
+    // Hasta el amanecer la mesa sigue viendo su voto fantasma como estaba.
+    ghostVoteUsed: hidden ? p.ghostVoteUsed : false,
     reminders: p.reminders.filter((r) => r.label !== ZOMBUUL_REALLY_DEAD),
   }));
   return touch(
-    { ...alive, nightDeaths: game.nightDeaths?.filter((id) => id !== playerId), dayDeaths: game.dayDeaths?.filter((id) => id !== playerId) },
-    `${player.name} vuelve a la vida.`,
+    {
+      ...alive,
+      nightDeaths: game.nightDeaths?.filter((id) => id !== playerId),
+      dayDeaths: game.dayDeaths?.filter((id) => id !== playerId),
+      nightRevivals: hidden ? [...(game.nightRevivals ?? []), playerId] : game.nightRevivals,
+    },
+    `${player.name} vuelve a la vida${hidden ? " (la mesa lo sabrá al amanecer)" : ""}.`,
   );
 }
 
@@ -317,24 +334,29 @@ export function swapSeats(game: Game, a: string, b: string): Game {
 export function startDay(game: Game): Game {
   if (game.phase.kind !== "night") throw new RuleViolation("Ya es de día.");
   const died = (game.nightDeaths ?? []).map((id) => findPlayer(game, id)?.name).filter(Boolean);
+  const revived = game.nightRevivals ?? [];
   const next = {
     ...game,
     phase: { kind: "day", number: game.phase.number } as Phase,
     nominations: [],
     executedToday: undefined,
     nightDeaths: [],
+    nightRevivals: [],
     dayDeaths: [],
     butcherNominationId: undefined,
     // El «No mata» de la Princesa solo valía la noche que acaba, y al nuevo Demonio ya se le ha dicho.
     // La borrachera del Juglar caduca en el crepúsculo de este día.
     players: game.players.map((p) => ({
       ...p,
+      ghostVoteUsed: revived.includes(p.id) ? false : p.ghostVoteUsed,
       reminders: p.reminders
         .filter((r) => !(r.sourceCharacterId === "princess" && r.label === "No mata") && r.label !== NEW_DEMON)
         .map((r) => (r.sourceCharacterId === "minstrel" && r.label === MINSTREL_TOMORROW ? { ...r, label: "Borracho" } : r)),
     })),
   };
-  return touch(next, died.length ? `Amanece. Han muerto esta noche: ${died.join(", ")}.` : "Amanece. Nadie ha muerto esta noche.");
+  const back = revived.map((id) => findPlayer(game, id)?.name).filter(Boolean);
+  const text = died.length ? `Amanece. Han muerto esta noche: ${died.join(", ")}.` : "Amanece. Nadie ha muerto esta noche.";
+  return touch(next, back.length ? `${text} Vuelve a la vida: ${back.join(", ")}.` : text);
 }
 
 export function startNight(game: Game): Game {

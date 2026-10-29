@@ -69,6 +69,8 @@ export interface Game {
   mastermindDay?: number;
   /** Muertos esta noche: ya lo están en el Grimorio, pero la mesa no lo sabe hasta el amanecer. */
   nightDeaths?: string[];
+  /** Resucitados esta noche (Profesor, Shabaloth…): la mesa los sigue viendo muertos hasta el amanecer. */
+  nightRevivals?: string[];
   /** Muertos durante el día de hoy (el Zombuul solo ataca si no ha muerto nadie). */
   dayDeaths?: string[];
   /** Personajes en juego que no tiene ningún jugador (Lil' Monsta, que cuida un Esbirro). */

@@ -6,6 +6,7 @@ import { choiceReminder, infoHints } from "@domain/services/NightInfo";
 import { buildNightOrder } from "@domain/services/NightOrder";
 import { seededRandom } from "@domain/services/Random";
 import { applySetupEffects } from "@domain/services/SetupGenerator";
+import { publicAlive, publicPlayers } from "@domain/services/TableView";
 
 // Casos que salieron al jugar Bad Moon Rising y Sects & Violets en la web publicada.
 
@@ -140,6 +141,30 @@ describe("Habilidades de Bad Moon Rising y Sects & Violets", () => {
     expect(alive(revived.game, "p3")).toBe(true);
     g = rules.killPlayer(revived.game, "p4");
     expect(alive(choose(g, "p4", "professor", "Vivo").game, "p4")).toBe(false);
+  });
+
+  it("una resurrección de noche no la ven los móviles hasta el amanecer", () => {
+    let g = rules.killPlayer(game(["professor", "imp", "poisoner", "chef", "empath"], { phase: { kind: "day", number: 1 } }), "p3");
+    g = { ...g, players: g.players.map((p) => (p.id === "p3" ? { ...p, ghostVoteUsed: true } : p)) };
+    g = rules.startNight(g);
+    g = choose(g, "p3", "professor", "Vivo").game;
+    expect(alive(g, "p3")).toBe(true);
+    expect(publicAlive(g, g.players[3])).toBe(false);
+    expect(publicPlayers(g, map)[3].ghostVoteUsed).toBe(true);
+    // Si vuelve a morir esa noche, para la mesa no ha pasado nada.
+    const again = rules.killPlayer(g, "p3");
+    expect(again.nightDeaths ?? []).not.toContain("p3");
+    expect(publicAlive(again, again.players[3])).toBe(false);
+    // Al amanecer ya se ve vivo, con su voto.
+    g = rules.startDay(g);
+    expect(publicAlive(g, g.players[3])).toBe(true);
+    expect(g.players[3].ghostVoteUsed).toBe(false);
+    expect(g.log[g.log.length - 1].text).toContain("Vuelve a la vida: J4");
+    // Quien muere y revive en la misma noche (el Narrador lo corrige) no cambia para la mesa.
+    let h = rules.startNight(rules.startDay(rules.startNight({ ...game(["imp", "poisoner", "chef", "empath", "monk"]), phase: { kind: "day", number: 1 } })));
+    h = rules.revivePlayer(rules.killPlayer(h, "p2"), "p2");
+    expect(h.nightRevivals ?? []).toEqual([]);
+    expect(publicAlive(h, h.players[2])).toBe(true);
   });
 
   it("Niña de la Luna: su elegido muere si es bueno, y su paso no se salta por estar muerta", () => {

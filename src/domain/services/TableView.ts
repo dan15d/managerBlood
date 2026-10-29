@@ -25,8 +25,12 @@ export function seatSecret(
   return { characterId: player.characterId, alignment: player.alignment };
 }
 
-/** Vivo para la mesa: quien ha muerto esta noche sigue vivo hasta que se anuncie al amanecer. */
-export const publicAlive = (game: Game, player: Player) => player.alive || (game.nightDeaths ?? []).includes(player.id);
+/**
+ * Vivo para la mesa: quien ha muerto esta noche sigue vivo hasta que se anuncie al amanecer, y
+ * quien ha resucitado esta noche sigue muerto hasta entonces.
+ */
+export const publicAlive = (game: Game, player: Player) =>
+  (player.alive && !(game.nightRevivals ?? []).includes(player.id)) || (game.nightDeaths ?? []).includes(player.id);
 
 export const publicPlayers = (game: Game, characters: Map<string, Character>): PublicPlayer[] =>
   game.players.map((p) => ({
