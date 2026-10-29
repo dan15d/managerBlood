@@ -80,8 +80,71 @@ export const setNotes = (game: Game, playerId: string, notes: string): Game =>
 export const addReminder = (game: Game, playerId: string, reminder: ReminderToken): Game =>
   touch(updatePlayer(game, playerId, (p) => ({ ...p, reminders: [...p.reminders, reminder] })));
 
+/**
+ * Pone un recordatorio como en el Grimorio físico: cada personaje tiene un número de fichas de
+ * cada recordatorio. Si ya están todas puestas, se mueve la primera (el Envenenador cambia de víctima).
+ */
+export function placeReminder(game: Game, playerId: string, reminder: ReminderToken, copies: number): Game {
+  const same = (r: ReminderToken) => r.sourceCharacterId === reminder.sourceCharacterId && r.label === reminder.label;
+  const placed = game.players.flatMap((p) => p.reminders.filter(same).map((r) => ({ playerId: p.id, id: r.id })));
+  const moved = copies > 0 && placed.length >= copies ? placed[0] : undefined;
+  const without = moved ? removeReminder(game, moved.playerId, moved.id) : game;
+  return addReminder(without, playerId, reminder);
+}
+
 export const removeReminder = (game: Game, playerId: string, reminderId: string): Game =>
   touch(updatePlayer(game, playerId, (p) => ({ ...p, reminders: p.reminders.filter((r) => r.id !== reminderId) })));
+
+/**
+ * Recordatorios que solo valen una noche y el día siguiente: protecciones, envenenamientos del
+ * Envenenador, muertes de esta noche… Al anochecer se proponen para quitarlos.
+ * Clave: personaje que lo pone + etiqueta («custom» para los genéricos).
+ */
+export const DUSK_REMINDERS = new Set([
+  "poisoner:Envenenado",
+  "monk:A salvo",
+  "innkeeper:A salvo",
+  "innkeeper:Borracho",
+  "sailor:Borracho",
+  "undertaker:Muerto hoy",
+  "exorcist:Elegido",
+  "devilsadvocate:Sobrevive ejecución",
+  "witch:Maldito",
+  "cerenovus:Loco",
+  "harpy:Loco",
+  "harpy:Segundo jugador",
+  "lunatic:Elegido",
+  "minstrel:Todos están borrachos",
+  "princess:No mata",
+  "acrobat:Elegido",
+  "flowergirl:Demonio ha votado",
+  "flowergirl:Demonio no ha votado",
+  "towncrier:Esbirro ha nominado",
+  "towncrier:Esbirro no ha nominado",
+  "zombuul:Muere hoy",
+  "godfather:Muere hoy",
+  "shabaloth:Vivo",
+  "legion:A punto de morir",
+  "organgrinder:A punto de morir",
+  "custom:Protegido",
+  "custom:Muerto esta noche",
+]);
+
+/** Las muertes de una noche («Muerto» de cualquier Demonio o personaje que mata) también caducan. */
+const isDuskReminder = (r: ReminderToken) => DUSK_REMINDERS.has(`${r.sourceCharacterId}:${r.label}`) || r.label === "Muerto";
+
+export const expiringReminders = (game: Game) =>
+  game.players.flatMap((p) => p.reminders.filter(isDuskReminder).map((reminder) => ({ playerId: p.id, reminder })));
+
+/** Quita varios recordatorios de una vez (los que caducan al anochecer). */
+export function removeReminders(game: Game, reminderIds: string[]): Game {
+  if (!reminderIds.length) return game;
+  const ids = new Set(reminderIds);
+  return touch(
+    { ...game, players: game.players.map((p) => ({ ...p, reminders: p.reminders.filter((r) => !ids.has(r.id)) })) },
+    `Se quitan ${ids.size} recordatorios que ya no valen.`,
+  );
+}
 
 /** Cambia el sitio de dos jugadores (por si se sientan distinto a como se apuntaron). */
 export function swapSeats(game: Game, a: string, b: string): Game {

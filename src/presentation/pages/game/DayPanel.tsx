@@ -1,19 +1,23 @@
+import type { Character } from "@domain/entities/Character";
 import type { Game } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { useState } from "react";
-import { Confirm } from "../../components/Sheet";
+import { Confirm, Sheet } from "../../components/Sheet";
 import { Gavel, Ghost, Hand, Moon } from "lucide-react";
 
 interface Props {
   game: Game;
+  characters: Map<string, Character>;
   onChange: (mutate: (g: Game) => Game) => void;
   /** Nominar tocando en el Grimorio: primero quién nomina y después a quién. */
   onStartNomination: () => void;
 }
 
 /** Nominaciones, votos y ejecución. El orden de voto empieza a la izquierda del nominado. */
-export function DayPanel({ game, onChange, onStartNomination }: Props) {
+export function DayPanel({ game, characters, onChange, onStartNomination }: Props) {
   const [confirmDusk, setConfirmDusk] = useState(false);
+  /** Recordatorios marcados para quitar al anochecer (null: la hoja está cerrada). */
+  const [cleaning, setCleaning] = useState<string[] | null>(null);
   const name = (id: string) => game.players.find((p) => p.id === id)?.name ?? "?";
   const threshold = rules.voteThreshold(game);
   const open = game.nominations.find((n) => !n.closed);
@@ -25,9 +29,18 @@ export function DayPanel({ game, onChange, onStartNomination }: Props) {
     return [...game.players].sort((a, b) => ((a.seat - seat - 1 + n) % n) - ((b.seat - seat - 1 + n) % n));
   };
 
+  // Al anochecer se proponen para quitar los recordatorios que solo valían una noche y un día.
+  const expiring = rules.expiringReminders(game);
+  const goToNight = () => {
+    if (expiring.length) {
+      setCleaning(expiring.map((e) => e.reminder.id));
+      return;
+    }
+    onChange(rules.startNight);
+  };
   const endDay = () => {
     if (block && !game.executedToday) setConfirmDusk(true);
-    else onChange(rules.startNight);
+    else goToNight();
   };
 
   return (
@@ -136,10 +149,55 @@ export function DayPanel({ game, onChange, onStartNomination }: Props) {
           confirmLabel="Anochecer sin ejecutar"
           onConfirm={() => {
             setConfirmDusk(false);
-            onChange(rules.startNight);
+            goToNight();
           }}
           onCancel={() => setConfirmDusk(false)}
         />
+      )}
+      {cleaning && (
+        <Sheet onClose={() => setCleaning(null)} title="Antes de anochecer" label="Recordatorios que caducan">
+          <p className="muted small" style={{ marginTop: 0 }}>
+            Estos recordatorios solo valían anoche y hoy. Marcados, se quitan; toca los que quieras dejar.
+          </p>
+          <div className="chips">
+            {expiring.map(({ playerId, reminder }) => {
+              const on = cleaning.includes(reminder.id);
+              const source = characters.get(reminder.sourceCharacterId);
+              return (
+                <button
+                  key={reminder.id}
+                  className="chip"
+                  aria-pressed={on}
+                  onClick={() => setCleaning(on ? cleaning.filter((x) => x !== reminder.id) : [...cleaning, reminder.id])}
+                >
+                  {reminder.label}
+                  {source ? ` (${source.name})` : ""} · {name(playerId)}
+                </button>
+              );
+            })}
+          </div>
+          <div className="action-bar action-bar--sheet">
+            <button
+              className="btn"
+              onClick={() => {
+                setCleaning(null);
+                onChange(rules.startNight);
+              }}
+            >
+              No quitar nada
+            </button>
+            <button
+              className="btn btn--primary"
+              onClick={() => {
+                const ids = cleaning;
+                setCleaning(null);
+                onChange((g) => rules.startNight(rules.removeReminders(g, ids)));
+              }}
+            >
+              <Moon /> Quitar {cleaning.length} y anochecer
+            </button>
+          </div>
+        </Sheet>
       )}
     </div>
   );

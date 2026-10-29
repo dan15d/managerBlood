@@ -13,9 +13,16 @@ import { FabledBar } from "./FabledBar";
 import { Grimoire } from "./Grimoire";
 import { NightPanel } from "./NightPanel";
 import { PlayerSheet } from "./PlayerSheet";
-import { ArrowLeft, ArrowLeftRight, Eye, EyeOff, Moon, ScrollText, Smartphone, Sparkles, Sun } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Eye, EyeOff, Moon, ScrollText, Smartphone, Sparkles, Sun, Undo2 } from "lucide-react";
+import { useWakeLock } from "../../hooks/useWakeLock";
 
 type Tab = "phase" | "ai" | "log";
+
+const UNDO_LIMIT = 30;
+
+/** Solo ha cambiado el paso de la noche (o la hora de guardado). */
+const onlyNavigation = (a: Game, b: Game) =>
+  JSON.stringify({ ...a, nightStep: 0, updatedAt: "" }) === JSON.stringify({ ...b, nightStep: 0, updatedAt: "" });
 
 /** Modo «toca una ficha»: poner un recordatorio o nominar sin abrir la hoja del jugador. */
 type Pick =
@@ -40,6 +47,10 @@ export function GamePage() {
   const characters = app.catalog.map();
   const saving = useRef(Promise.resolve());
   const gameRef = useRef<Game | null>(null);
+  // Estados anteriores para «Deshacer» (solo en esta pantalla; al recargar se pierden).
+  const history = useRef<Game[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+  useWakeLock();
 
   useEffect(() => {
     if (!id) return;
@@ -59,6 +70,15 @@ export function GamePage() {
       });
   }, [app, id, navigate, toast]);
 
+  const persist = useCallback(
+    (next: Game) => {
+      gameRef.current = next;
+      setGame(next);
+      saving.current = saving.current.then(() => app.saveGame.execute(next)).catch((e) => toast(errorMessage(e), "error"));
+    },
+    [app, toast],
+  );
+
   /** Aplica una regla del dominio y guarda (en cola, para no pisar guardados anteriores). */
   const change = useCallback(
     (mutate: (g: Game) => Game) => {
@@ -72,12 +92,25 @@ export function GamePage() {
         return;
       }
       if (next === current) return;
-      gameRef.current = next;
-      setGame(next);
-      saving.current = saving.current.then(() => app.saveGame.execute(next)).catch((e) => toast(errorMessage(e), "error"));
+      // Moverse por la hoja de noche no se deshace: solo lo que cambia el Grimorio.
+      if (!onlyNavigation(current, next)) {
+        history.current = [...history.current.slice(-(UNDO_LIMIT - 1)), current];
+        setCanUndo(true);
+      }
+      persist(next);
     },
-    [app, toast],
+    [persist, toast],
   );
+
+  const undo = useCallback(() => {
+    const previous = history.current.pop();
+    const current = gameRef.current;
+    if (!previous || !current) return;
+    setCanUndo(history.current.length > 0);
+    const undone = current.log.length > previous.log.length ? current.log[current.log.length - 1].text : undefined;
+    persist({ ...previous, updatedAt: new Date().toISOString() });
+    toast(undone ? `Deshecho: ${undone}` : "Deshecho.");
+  }, [persist, toast]);
 
   const steps = useMemo(() => (game ? buildNightOrder(game, characters) : []), [game, characters]);
 
@@ -107,8 +140,12 @@ export function GamePage() {
       return setPick({ kind: "seat" });
     }
     if (pick.kind === "reminder") {
-      change((g) => rules.addReminder(g, pid, { id: app.newId(), sourceCharacterId: pick.sourceId, label: pick.label }));
-      toast(`«${pick.label}» en ${name(pid)}.`);
+      // Tantas fichas como tiene el personaje: si ya están todas, la primera se mueve aquí.
+      const copies = characters.get(pick.sourceId)?.reminders.filter((l) => l === pick.label).length ?? 0;
+      const placed = game.players.filter((p) => p.reminders.some((r) => r.sourceCharacterId === pick.sourceId && r.label === pick.label));
+      const from = copies > 0 && placed.length >= copies ? placed[0] : undefined;
+      change((g) => rules.placeReminder(g, pid, { id: app.newId(), sourceCharacterId: pick.sourceId, label: pick.label }, copies));
+      toast(from && from.id !== pid ? `«${pick.label}» pasa de ${from.name} a ${name(pid)}.` : `«${pick.label}» en ${name(pid)}.`);
       return setPick(null);
     }
     if (pick.kind === "nominator") {
@@ -160,6 +197,10 @@ export function GamePage() {
             {game.scriptName} · {game.players.length} jugadores
           </div>
         </div>
+        <button className="btn btn--small" disabled={!canUndo} onClick={undo} aria-label="Deshacer" title="Deshace el último cambio del Grimorio">
+          <Undo2 />
+          <span className="label-wide"> Deshacer</span>
+        </button>
         <button
           className="btn btn--small"
           aria-pressed={hidden}
@@ -275,6 +316,7 @@ export function GamePage() {
               ) : (
                 <DayPanel
                   game={game}
+                  characters={characters}
                   onChange={change}
                   onStartNomination={() => {
                     setPick({ kind: "nominator" });

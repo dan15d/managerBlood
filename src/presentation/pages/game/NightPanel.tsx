@@ -11,7 +11,8 @@ import { Sheet } from "../../components/Sheet";
 import { INFO_HEADINGS, ShowCard } from "../../components/ShowCard";
 import { Token } from "../../components/Token";
 import { NIGHT_ICONS } from "../../wikiAssets";
-import { ChevronLeft, ChevronRight, Eye, Skull, Sun, TriangleAlert, VenetianMask } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Lightbulb, Pointer, Skull, Sun, TriangleAlert, VenetianMask } from "lucide-react";
+import { CHOICE_REMINDER, infoHints } from "@domain/services/NightInfo";
 
 interface Props {
   game: Game;
@@ -52,6 +53,10 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
   const last = index === steps.length - 1;
   // Jugadores de este paso con un recordatorio que les quita la habilidad (envenenado, borracho…).
   const disabled = step.playerIds.map(player).filter((p) => p.reminders.some((r) => DISABLING.test(r.label)));
+  const hints = step.character ? infoHints(game, step.character, characters) : [];
+  // Recordatorio de quien elige jugador cada noche (Envenenador, Monje, Demonio…).
+  const chooser = step.character && step.playerIds.length > 0 ? CHOICE_REMINDER[step.character.id] : undefined;
+  const otherReminders = [...new Set(step.character?.reminders ?? [])].filter((label) => label !== chooser);
 
   return (
     <div>
@@ -123,6 +128,45 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
           </p>
         )}
 
+        {hints.length > 0 && (
+          <div className="info-hint" role="note">
+            <span className="info-hint__title">
+              <Lightbulb /> Respuesta verdadera
+            </span>
+            {hints.map((h) => (
+              <p key={h.playerId} style={{ margin: 0 }}>
+                {hints.length > 1 && <strong>{player(h.playerId).name}: </strong>}
+                {h.text}
+              </p>
+            ))}
+            {hints[0].caveats.map((c) => (
+              <p key={c} className="small muted" style={{ margin: 0 }}>
+                {c}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {/* Quien elige a alguien (Envenenador, Monje, Demonio…): un toque y se pone su recordatorio. */}
+        {chooser && (
+          <button className="btn btn--primary btn--block" style={{ marginTop: 8 }} onClick={() => onPickReminder(step.character!.id, chooser)}>
+            <Pointer /> Toca a quién elige · «{chooser}»
+          </button>
+        )}
+
+        {step.character && otherReminders.length > 0 && (
+          <div className="step-reminders">
+            <span className="small muted">{chooser ? "Otros recordatorios:" : "Poner recordatorio:"}</span>
+            <div className="chips">
+              {otherReminders.map((label) => (
+                <button key={label} className="chip chip--reminder" onClick={() => onPickReminder(step.character!.id, label)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {step.character && <SpecialCases key={step.key} characterId={step.character.id} inPlayIds={gameCharacterIds(game)} />}
         {step.character && (
           <details className="guide__section" key={`guide:${step.key}`} style={{ marginTop: 6 }}>
@@ -131,19 +175,6 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
               <CharacterGuide characterId={step.character.id} audience="storyteller" />
             </div>
           </details>
-        )}
-
-        {step.character && step.character.reminders.length > 0 && (
-          <div className="step-reminders">
-            <span className="small muted">Poner recordatorio:</span>
-            <div className="chips">
-              {[...new Set(step.character.reminders)].map((label) => (
-                <button key={label} className="chip chip--reminder" onClick={() => onPickReminder(step.character!.id, label)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
         )}
 
         {step.dead && (

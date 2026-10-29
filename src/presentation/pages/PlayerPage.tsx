@@ -7,10 +7,11 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { CharacterGuide } from "../components/CharacterGuide";
 import { ScriptCharacterList } from "../components/ScriptCharacterList";
-import { Confirm } from "../components/Sheet";
+import { Confirm, Sheet } from "../components/Sheet";
 import { SeatCircle } from "../components/SeatCircle";
 import { Token } from "../components/Token";
-import { EyeOff, Flag, Moon, ScrollText, Sun, Users, VenetianMask } from "lucide-react";
+import { usePlayerNotes, type SeatNote } from "../hooks/usePlayerNotes";
+import { Eye, EyeOff, Flag, Moon, NotebookPen, ScrollText, Sun, Users, VenetianMask } from "lucide-react";
 
 type Tab = "me" | "script" | "players";
 
@@ -22,7 +23,11 @@ export function PlayerPage() {
   const [view, setView] = useState<PlayerView | null | undefined>(undefined);
   const [tab, setTab] = useState<Tab>("me");
   const [revealed, setRevealed] = useState(false);
+  /** Se está manteniendo pulsada la ficha (al soltar se oculta). */
+  const [holding, setHolding] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [noting, setNoting] = useState<string | null>(null);
+  const { notes, update: updateNote } = usePlayerNotes(gameId);
 
   useEffect(() => {
     if (!app.player) return;
@@ -32,6 +37,19 @@ export function PlayerPage() {
   // Cuando el Narrador cambia el personaje, se vuelve a ocultar para que nadie lo vea de rebote.
   const characterId = view?.characterId;
   useEffect(() => setRevealed(false), [characterId]);
+
+  // A la vista se oculta solo: al salir de la app, al cambiar de pestaña o al minuto.
+  useEffect(() => {
+    const hide = () => document.visibilityState !== "visible" && setRevealed(false);
+    document.addEventListener("visibilitychange", hide);
+    return () => document.removeEventListener("visibilitychange", hide);
+  }, []);
+  useEffect(() => {
+    if (!revealed || holding) return;
+    const timer = setTimeout(() => setRevealed(false), 60_000);
+    return () => clearTimeout(timer);
+  }, [revealed, holding]);
+  useEffect(() => setRevealed(false), [tab]);
 
   const character = characterId ? app.catalog.get(characterId) : undefined;
   const alive = view?.players.filter((p) => p.alive).length ?? 0;
@@ -131,11 +149,26 @@ export function PlayerPage() {
           </section>
         ) : (
           <section className="reveal" style={{ minHeight: "auto", paddingTop: 12 }}>
+            {/* Mantener pulsado para mirar: al soltar se oculta. Con teclado, Intro lo muestra y lo oculta. */}
             <button
               type="button"
-              className="reveal__toggle"
-              onClick={() => setRevealed(!revealed)}
-              aria-label={revealed ? "Ocultar mi personaje" : "Ver mi personaje"}
+              className="reveal__toggle reveal__toggle--hold"
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setHolding(true);
+                setRevealed(true);
+              }}
+              onPointerUp={() => {
+                if (holding) setRevealed(false);
+                setHolding(false);
+              }}
+              onPointerCancel={() => {
+                setHolding(false);
+                setRevealed(false);
+              }}
+              onClick={(e) => e.detail === 0 && setRevealed(!revealed)}
+              onContextMenu={(e) => e.preventDefault()}
+              aria-label={revealed ? "Ocultar mi personaje" : "Ver mi personaje (mantén pulsado)"}
             >
               <Token character={character} alignment={view.alignment} size={200} hidden={!revealed} dead={!view.alive} />
             </button>
@@ -154,12 +187,21 @@ export function PlayerPage() {
                 <div style={{ width: "100%", maxWidth: 480, textAlign: "left" }}>
                   <CharacterGuide key={character.id} characterId={character.id} audience="player" />
                 </div>
-                <button className="btn btn--ghost" onClick={() => setRevealed(false)}>
-                  <EyeOff /> Ocultar
-                </button>
+                {!holding && (
+                  <button className="btn btn--ghost" onClick={() => setRevealed(false)}>
+                    <EyeOff /> Ocultar
+                  </button>
+                )}
               </>
             ) : (
-              <p className="muted">Toca la ficha para ver tu personaje. Que nadie mire tu pantalla.</p>
+              <>
+                <p className="muted" style={{ margin: 0 }}>
+                  Mantén pulsada la ficha para mirar tu personaje; al soltar se oculta. Que nadie mire tu pantalla.
+                </p>
+                <button className="btn btn--ghost btn--small" onClick={() => setRevealed(true)}>
+                  <Eye /> Dejarlo a la vista para leer la guía
+                </button>
+              </>
             )}
             <div className={`alert ${view.alive ? "alert--ok" : "alert--warning"}`} style={{ width: "100%", maxWidth: 480 }}>
               {view.alive
@@ -214,17 +256,23 @@ export function PlayerPage() {
                 renderSeat={(p, size) => {
                   const traveller = p.travellerId ? app.catalog.get(p.travellerId) : undefined;
                   const me = p.seat === view.seat;
+                  // Lo que dice ser según mis notas (los Viajeros enseñan su personaje real, que es público).
+                  const note = notes[p.name];
+                  const claimed = !traveller && note?.claim ? app.catalog.get(note.claim) : undefined;
                   return (
                     <>
                       <Token
-                        character={traveller}
+                        character={traveller ?? claimed}
+                        alignment={note?.guess}
                         size={size}
                         dead={!p.alive}
-                        hidden={!traveller}
+                        hidden={!traveller && !claimed}
+                        dim={!!claimed}
                         glow={me}
-                        label={`${p.name}${traveller ? `, ${traveller.name}` : ""}${p.alive ? "" : ", muerto"}${me ? " (tú)" : ""}`}
+                        onClick={me ? undefined : () => setNoting(p.name)}
+                        label={`${p.name}${traveller ? `, ${traveller.name}` : claimed ? `, dice ser ${claimed.name}` : ""}${p.alive ? "" : ", muerto"}${me ? " (tú)" : ""}`}
                       />
-                      <span className="seat__name">
+                      <span className={`seat__name ${note?.guess === "evil" ? "seat__name--evil" : ""}`}>
                         {!p.alive && !p.ghostVoteUsed && <span title="Le queda el voto">● </span>}
                         {p.name}
                         {me && " (tú)"}
@@ -234,7 +282,8 @@ export function PlayerPage() {
                 }}
               />
               <p className="muted small">
-                {alive} vivos de {view.players.length}. ● = muerto al que le queda el voto. Los Viajeros se ven porque son públicos.
+                {alive} vivos de {view.players.length}. ● = muerto al que le queda el voto. Toca a un jugador para apuntar qué dice ser y
+                qué crees que es: tus notas solo se guardan en este móvil.
               </p>
               <ul className="log">
                 {view.players.map((p) => (
@@ -242,17 +291,33 @@ export function PlayerPage() {
                     <span className="muted" style={{ width: 24 }}>
                       {p.seat + 1}
                     </span>
-                    <span style={{ flex: 1 }}>
+                    <span style={{ flex: 1, minWidth: 0 }}>
                       {p.name}
                       {p.seat === view.seat && <span className="muted small"> (tú)</span>}
+                      {notes[p.name] && <NoteSummary note={notes[p.name]} />}
                     </span>
                     <span className="small">{p.alive ? "Vivo" : p.ghostVoteUsed ? "Muerto, sin voto" : "Muerto, con voto"}</span>
+                    {p.seat !== view.seat && (
+                      <button className="btn btn--small btn--ghost icon-btn" aria-label={`Notas sobre ${p.name}`} onClick={() => setNoting(p.name)}>
+                        <NotebookPen />
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
             </>
           )}
         </section>
+      )}
+
+      {noting && (
+        <NotesSheet
+          name={noting}
+          note={notes[noting] ?? {}}
+          script={script}
+          onChange={(note) => updateNote(noting, note)}
+          onClose={() => setNoting(null)}
+        />
       )}
 
       {leaving && (
@@ -265,5 +330,71 @@ export function PlayerPage() {
         />
       )}
     </main>
+  );
+}
+
+/** Resumen de mis notas sobre un jugador, debajo de su nombre en la lista. */
+function NoteSummary({ note }: { note: SeatNote }) {
+  const { app } = useApp();
+  const claim = note.claim ? app.catalog.get(note.claim)?.name : undefined;
+  const parts = [claim && `dice ${claim}`, note.guess && (note.guess === "good" ? "creo bueno" : "creo malo"), note.text?.trim()].filter(Boolean);
+  return (
+    <span className={`small ${note.guess === "evil" ? "team-demon" : "muted"}`} style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      {parts.join(" · ")}
+    </span>
+  );
+}
+
+/** Mis notas sobre otro jugador: qué dice ser, qué creo que es y lo que quiera apuntar. */
+function NotesSheet(props: { name: string; note: SeatNote; script: Character[]; onChange: (note: SeatNote) => void; onClose: () => void }) {
+  const { name, note, script, onChange, onClose } = props;
+  const claimable = script.filter((c) => c.team !== "fabled" && c.team !== "loric");
+  return (
+    <Sheet onClose={onClose} title={`Notas sobre ${name}`} label={`Notas sobre ${name}`}>
+      <p className="muted small" style={{ marginTop: 0 }}>
+        Solo las ves tú: se guardan en este móvil y no llegan al Narrador.
+      </p>
+      <label className="field">
+        <span>Dice ser</span>
+        <select className="input" value={note.claim ?? ""} onChange={(e) => onChange({ ...note, claim: e.target.value || undefined })}>
+          <option value="">— No lo ha dicho —</option>
+          {claimable.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="field">
+        <span>Creo que es</span>
+        <div className="chips">
+          {(
+            [
+              [undefined, "No sé"],
+              ["good", "Bueno"],
+              ["evil", "Malo"],
+            ] as const
+          ).map(([guess, label]) => (
+            <button key={label} className="chip" aria-pressed={note.guess === guess} onClick={() => onChange({ ...note, guess })}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <label className="field">
+        <span>Notas</span>
+        <textarea
+          className="input"
+          value={note.text ?? ""}
+          placeholder="Qué información dijo, a quién nominó, a quién votó…"
+          onChange={(e) => onChange({ ...note, text: e.target.value })}
+        />
+      </label>
+      <div className="action-bar action-bar--sheet">
+        <button className="btn btn--gold" onClick={onClose}>
+          Listo
+        </button>
+      </div>
+    </Sheet>
   );
 }

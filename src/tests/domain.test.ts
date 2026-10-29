@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { StaticCharacterCatalog, StaticOfficialScripts } from "@infrastructure/catalog/StaticCatalog";
 import type { Game, Player } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
+import { aliveNeighbours, infoHints } from "@domain/services/NightInfo";
 import { buildNightOrder } from "@domain/services/NightOrder";
 import { seededRandom } from "@domain/services/Random";
 import { applySetupEffects, pickBluffs, pickDecoys, randomSelection, seatMarionette } from "@domain/services/SetupGenerator";
@@ -304,5 +305,67 @@ describe("Fábulas, Lóricos y casos especiales", () => {
     for (let seed = 0; seed < 10; seed++) {
       expect(pickDecoys(chars(["marionette", "choirboy"]), pool, seededRandom(seed)).marionette).toBe("chef");
     }
+  });
+});
+
+describe("ayudas del Narrador", () => {
+  // Asientos 0..6: Lavandera, Bibliotecario, Envenenador, Diablillo, Empático, Chef, Investigador.
+  const ids = ["washerwoman", "librarian", "poisoner", "imp", "empath", "chef", "investigator"];
+  const night = (extra: Partial<Game> = {}) => game(ids, { phase: { kind: "night", number: 1 }, ...extra });
+  const hint = (g: Game, id: string) => infoHints(g, catalog.get(id)!, catalog.map());
+
+  it("el Empático cuenta sus vecinos vivos malos, saltando a los muertos", () => {
+    expect(hint(night(), "empath")[0].text).toContain("1");
+    const g = rules.killPlayer(night(), "p3");
+    // Muerto el Diablillo, su vecino vivo de ese lado es el Envenenador.
+    expect(hint(g, "empath")[0].text).toContain("1");
+    expect(aliveNeighbours(g, g.players[4]).map((p) => p.characterId)).toEqual(["poisoner", "chef"]);
+  });
+
+  it("el Chef cuenta parejas de malos y el Relojero los pasos hasta el Esbirro", () => {
+    expect(hint(night(), "chef")[0].text).toContain("1");
+    expect(hint(game(["clockmaker", "imp", "chef", "poisoner", "empath"]), "clockmaker")[0].text).toContain("2");
+  });
+
+  it("el Bibliotecario sin Forasteros recibe un 0; el Enterrador ve al ejecutado", () => {
+    expect(hint(night(), "librarian")[0].text).toContain("0");
+    const g = { ...night({ phase: { kind: "night", number: 2 } }), executedToday: "p5" };
+    expect(hint(g, "undertaker")).toEqual([]);
+    const withUndertaker = game(["undertaker", "chef", "poisoner", "imp", "empath"], { executedToday: "p1" });
+    expect(hint(withUndertaker, "undertaker")[0].text).toContain("Chef");
+  });
+
+  it("la Pitonisa dice sí con el Demonio y con la pista falsa", () => {
+    let g = game(["fortuneteller", "chef", "poisoner", "imp", "empath"]);
+    expect(hint(g, "fortuneteller")[0].text).toContain("Falta poner la pista falsa");
+    g = rules.addReminder(g, "p1", { id: "r", sourceCharacterId: "fortuneteller", label: "Falso positivo" });
+    expect(hint(g, "fortuneteller")[0].text).toMatch(/4\. J4 o 2\. J2/);
+  });
+
+  it("avisa si el Espía o el Recluso pueden cambiar la respuesta", () => {
+    const g = game(["empath", "recluse", "spy", "imp", "chef"]);
+    expect(hint(g, "empath")[0].caveats.join(" ")).toContain("puede aparecer distinto");
+  });
+
+  it("el recordatorio del Envenenador se mueve en vez de duplicarse", () => {
+    const poison = (id: string) => ({ id, sourceCharacterId: "poisoner", label: "Envenenado" });
+    let g = rules.placeReminder(night(), "p0", poison("a"), 1);
+    g = rules.placeReminder(g, "p4", poison("b"), 1);
+    expect(g.players[0].reminders).toEqual([]);
+    expect(g.players[4].reminders.map((r) => r.id)).toEqual(["b"]);
+    // Sin límite (recordatorios propios) se acumulan.
+    g = rules.placeReminder(g, "p5", { id: "c", sourceCharacterId: "custom", label: "Ojo" }, 0);
+    g = rules.placeReminder(g, "p6", { id: "d", sourceCharacterId: "custom", label: "Ojo" }, 0);
+    expect(g.players.filter((p) => p.reminders.some((r) => r.label === "Ojo"))).toHaveLength(2);
+  });
+
+  it("al anochecer se proponen los recordatorios de una noche y un día", () => {
+    let g = night();
+    g = rules.addReminder(g, "p0", { id: "a", sourceCharacterId: "poisoner", label: "Envenenado" });
+    g = rules.addReminder(g, "p1", { id: "b", sourceCharacterId: "imp", label: "Muerto" });
+    g = rules.addReminder(g, "p2", { id: "c", sourceCharacterId: "drunk", label: "Es el Borracho" });
+    expect(rules.expiringReminders(g).map((e) => e.reminder.id)).toEqual(["a", "b"]);
+    g = rules.removeReminders(g, ["a", "b"]);
+    expect(g.players.flatMap((p) => p.reminders).map((r) => r.id)).toEqual(["c"]);
   });
 });

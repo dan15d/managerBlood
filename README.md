@@ -13,6 +13,8 @@ Se puede instalar en el móvil desde el navegador («Añadir a pantalla de inici
 - **Fábulas y Lóricos** al preparar y durante la partida (Centinela, Papa, Juguetero, Tor, Jardinero…), y las 131 **incompatibilidades** oficiales (jinxes) de la wiki: el Djinn entra solo si el guion las tiene, y se avisan en la preparación, el Grimorio y la IA. También se contemplan el Ateo, el Invocador, el Cazarrecompensas, el Tonto del pueblo y la Marioneta (junto al Demonio).
 - **Guía de cada personaje** de la wiki, distinta según quién la lea. El Narrador ve el resumen, cómo narrarlo, ejemplos y detalles de reglas, más los casos especiales (incompatibilidades e interacciones) con lo que hay en juego. El jugador ve el resumen, ejemplos, consejos y cómo farolear del personaje que cree ser, y nunca nada que dependa de la partida. Cada guía se descarga al abrirla.
 - Grimorio circular, recordatorios, vivos/muertos, voto fantasma, nominaciones y umbral de ejecución.
+- Ayudas al Narrador: **Deshacer**, pantalla siempre encendida, la **respuesta verdadera** de los personajes de información (Empático, Chef, Lavandera, Bibliotecario, Investigador, Enterrador, Pitonisa, Relojero), «Toca a quién elige» para poner el recordatorio de un toque (las fichas se mueven como en el Grimorio físico) y, al anochecer, quitar los recordatorios que ya no valen.
+- Para el jugador: **mantener pulsada la ficha** para ver su personaje (se oculta al soltar, al salir de la app o al minuto) y **notas privadas** sobre los demás (qué dicen ser y qué cree que son), guardadas solo en su móvil.
 - «Repartir»: se pasa el móvil y cada jugador ve su personaje en secreto.
 
 ## Empezar

@@ -860,6 +860,41 @@ button.token {
   font-size: 0.85rem;
 }
 
+/* Ficha del jugador que se mira manteniéndola pulsada: sin menú, ni selección, ni scroll al pulsar. */
+.reveal__toggle--hold {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Respuesta verdadera de los personajes de información (solo la ve el Narrador). */
+.info-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--fabled);
+  background: var(--surface-2);
+}
+
+.info-hint__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--fabled);
+}
+
+.info-hint__title .lucide {
+  width: 16px;
+  height: 16px;
+}
+
 /* Guía de la wiki: apartados plegables. */
 .guide {
   display: flex;
