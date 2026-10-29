@@ -186,8 +186,12 @@ export function GamePage() {
     // La Virgen: si la nomina un Aldeano por primera vez, ese Aldeano es ejecutado en el acto.
     const nominatorId = pick.nominatorId;
     let virgin = { executes: false, spy: false };
+    let died: string[] = [];
     change((g) => {
-      const result = rules.virginNomination(rules.nominate(g, nominatorId, pid, app.newId()), nominatorId, pid, characters);
+      const nominated = rules.nominate(g, nominatorId, pid, app.newId(), characters);
+      // La Bruja o el Gólem pueden matar al nominar.
+      died = g.players.filter((p) => p.alive && !nominated.players.find((x) => x.id === p.id)?.alive).map((p) => p.name);
+      const result = rules.virginNomination(nominated, nominatorId, pid, characters);
       virgin = result;
       return result.executes
         ? rules.executeNow(result.game, nominatorId, `${name(nominatorId)} nomina a la Virgen siendo Aldeano: es ejecutado en el acto.`, characters)
@@ -195,6 +199,7 @@ export function GamePage() {
     });
     if (virgin.executes) toast(`${name(pid)} es la Virgen y ${name(nominatorId)} es Aldeano: ${name(nominatorId)} es ejecutado en el acto.`);
     else if (virgin.spy) toast(`${name(pid)} es la Virgen y la nomina el Espía: si decides que se registra como Aldeano, usa «Ejecutar sin votación».`);
+    else if (died.length) toast(`${died.join(" y ")} muere al nominar (${rules.witchCursed(game, nominatorId) ? "maldición de la Bruja" : "Gólem"}).`);
     setPick(null);
     setTab("phase");
   };

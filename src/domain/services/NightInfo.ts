@@ -161,6 +161,21 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
         const yes = [...demons, ...(herring ? [herring] : [])].map((p) => `${p.seat + 1}. ${p.name}`);
         return `Responde SÍ si elige a ${yes.join(" o ")}${herring ? " (pista falsa incluida)" : ""}.${herring ? "" : " Falta poner la pista falsa en un jugador bueno."}`;
       }
+      case "towncrier": {
+        // Las nominaciones del día siguen en la partida hasta el amanecer.
+        const minions = game.nominations
+          .filter((n) => !n.exile)
+          .map((n) => game.players.find((p) => p.id === n.nominatorId))
+          .filter((p): p is Player => !!p && team(p) === "minion");
+        return minions.length
+          ? `Asiente: sí ha nominado un Esbirro (${[...new Set(minions.map((p) => p.name))].join(", ")}).`
+          : "Niega: hoy no ha nominado ningún Esbirro.";
+      }
+      case "flowergirl": {
+        const demonIds = new Set(demonPlayers(game, characters).map((p) => p.id));
+        const voted = game.nominations.some((n) => n.voterIds.some((id) => demonIds.has(id)));
+        return voted ? "Asiente: el Demonio ha votado hoy." : "Niega: hoy el Demonio no ha votado.";
+      }
       case "zombuul": {
         // Solo ataca si nadie ha muerto durante el día (también cuenta su propia muerte aparente).
         const died = (game.dayDeaths ?? []).map((id) => game.players.find((p) => p.id === id)?.name).filter(Boolean);

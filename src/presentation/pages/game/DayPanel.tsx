@@ -77,6 +77,9 @@ export function DayPanel({ game, characters, onChange, onStartNomination, onStar
               const on = open.voterIds.includes(p.id);
               // Burócrata (×3), Ladrón (−1) y Banshee (×2): su voto no vale 1.
               const weight = rules.voteWeight(p);
+              // Mayordomo sin su señor (no cuenta) y Fanático que no vota (debe hacerlo).
+              const ignored = on && rules.voteIgnored(game, open, p);
+              const missing = !on && !open.exile && rules.mustVote(game, p);
               return (
                 <button
                   key={p.id}
@@ -89,7 +92,13 @@ export function DayPanel({ game, characters, onChange, onStartNomination, onStar
                     {on ? <Hand /> : p.alive ? null : <Ghost />}
                   </span>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                  {weight !== 1 && <span className="vote-weight">{weight > 0 ? `×${weight}` : "−1"}</span>}
+                  {ignored ? (
+                    <span className="vote-weight" title={ignored}>no cuenta</span>
+                  ) : missing ? (
+                    <span className="vote-weight" title="El Fanático debe votar en todas las nominaciones">debe votar</span>
+                  ) : (
+                    weight !== 1 && <span className="vote-weight">{weight > 0 ? `×${weight}` : "−1"}</span>
+                  )}
                 </button>
               );
             })}

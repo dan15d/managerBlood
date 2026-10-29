@@ -337,18 +337,39 @@ export function canNominate(game: Game, nominatorId: string, nomineeId: string):
   if (!nominator.alive && !isBanshee(nominator)) return "Solo los jugadores vivos pueden nominar.";
   const made = executionNominations(game).filter((n) => n.nominatorId === nominatorId).length;
   if (!butcherAgain && made >= (isBanshee(nominator) ? 2 : 1)) return `${nominator.name} ya ha nominado hoy.`;
+  if (nominator.characterId === "golem" && has(nominator, "golem", "No puede nominar")) return `${nominator.name} es el Gólem y ya nominó una vez.`;
   if (nomineeId && executionNominations(game).some((n) => n.nomineeId === nomineeId)) return "Ese jugador ya ha sido nominado hoy.";
   return null;
 }
 
-export function nominate(game: Game, nominatorId: string, nomineeId: string, id: string): Game {
+/** El maldito de la Bruja (viva, sana y con más de 3 vivos) muere si nomina. */
+export const witchCursed = (game: Game, nominatorId: string) => {
+  const nominator = findPlayer(game, nominatorId);
+  const witch = game.players.some((p) => p.characterId === "witch" && p.alive && healthy(p));
+  return !!nominator && witch && has(nominator, "witch", "Maldito") && alivePlayers(game).length > 3;
+};
+
+/**
+ * Nominar. La nominación se hace igual, pero:
+ * - El maldito de la Bruja muere al nominar.
+ * - El Gólem solo nomina una vez y, si el nominado no es el Demonio, muere.
+ */
+export function nominate(game: Game, nominatorId: string, nomineeId: string, id: string, characters?: Map<string, Character>): Game {
   const problem = canNominate(game, nominatorId, nomineeId);
   if (problem) throw new RuleViolation(problem);
   const nomination: Nomination = { id, nominatorId, nomineeId, voterIds: [], closed: false };
-  const names = [findPlayer(game, nominatorId)!.name, findPlayer(game, nomineeId)!.name];
+  const nominator = findPlayer(game, nominatorId)!;
+  const nominee = findPlayer(game, nomineeId)!;
   // Tras la ejecución, solo el Carnicero puede nominar: se recuerda cuál es su nominación.
   const butcher = game.executedToday ? { butcherNominationId: id } : {};
-  return touch({ ...game, ...butcher, nominations: [...game.nominations, nomination] }, `${names[0]} nomina a ${names[1]}.`);
+  let next = touch({ ...game, ...butcher, nominations: [...game.nominations, nomination] }, `${nominator.name} nomina a ${nominee.name}.`);
+  if (witchCursed(game, nominatorId)) next = killPlayer(next, nominatorId, "muere por la maldición de la Bruja");
+  if (nominator.characterId === "golem") {
+    next = withReminder(next, nominatorId, "golem", "No puede nominar");
+    const demon = characters && characters.get(nominee.characterId)?.team === "demon";
+    if (characters && healthy(nominator) && !demon) next = killPlayer(next, nomineeId, "muere por el Gólem");
+  }
+  return next;
 }
 
 /** Exiliar a un Viajero vivo: cualquiera puede pedirlo, una vez por Viajero y día. */
@@ -391,9 +412,30 @@ export function voteWeight(player: Player): number {
   return 1;
 }
 
-/** Votos de una nominación, con el peso de cada voto (Burócrata, Ladrón, Banshee). */
+/** El señor del Mayordomo (el jugador con su recordatorio «Señor»). */
+const butlerMaster = (game: Game) => game.players.find((p) => has(p, "butler", "Señor"));
+
+/**
+ * El voto del Mayordomo sano no cuenta si su señor no vota en esa nominación. Devuelve el motivo,
+ * o null si el voto cuenta.
+ */
+export function voteIgnored(game: Game, nomination: Nomination, player: Player): string | null {
+  if (player.characterId !== "butler" || !healthy(player) || nomination.exile) return null;
+  const master = butlerMaster(game);
+  return master && !nomination.voterIds.includes(master.id) ? `${player.name} es el Mayordomo y su señor (${master.name}) no vota: su voto no cuenta.` : null;
+}
+
+/** El Fanático sano debe votar en todas las nominaciones si hay 5 o más vivos. */
+export const mustVote = (game: Game, player: Player) =>
+  player.characterId === "zealot" && player.alive && healthy(player) && alivePlayers(game).length >= 5;
+
+/** Votos de una nominación, con el peso de cada voto (Burócrata, Ladrón, Banshee) y sin el Mayordomo sin su señor. */
 export const voteCount = (game: Game, nomination: Nomination) =>
-  nomination.voterIds.reduce((sum, id) => sum + (findPlayer(game, id) ? voteWeight(findPlayer(game, id)!) : 1), 0);
+  nomination.voterIds.reduce((sum, id) => {
+    const voter = findPlayer(game, id);
+    if (!voter) return sum + 1;
+    return voteIgnored(game, nomination, voter) ? sum : sum + voteWeight(voter);
+  }, 0);
 
 export function toggleVote(game: Game, nominationId: string, voterId: string): Game {
   const nomination = game.nominations.find((n) => n.id === nominationId);
@@ -859,6 +901,12 @@ function baseVictory(game: Game, characters: Map<string, Character>): VictoryHin
   // El Santo ejecutado hoy (y sano): su equipo pierde.
   if (executed?.characterId === "saint" && !executed.alive && healthy(executed)) {
     return { winner: executed.alignment === "good" ? "evil" : "good", reason: "Han ejecutado al Santo." };
+  }
+  // Fearmonger: si nomina a su elegido («Terror») y se le ejecuta, el equipo del ejecutado pierde.
+  const fearmonger = game.players.find((p) => p.characterId === "fearmonger" && p.alive && healthy(p));
+  const byFearmonger = fearmonger && game.nominations.some((n) => !n.exile && n.nominatorId === fearmonger.id && n.nomineeId === executed?.id);
+  if (executed && byFearmonger && has(executed, "fearmonger", "Terror")) {
+    return { winner: executed.alignment === "good" ? "evil" : "good", reason: "El Fearmonger ha nominado y se ha ejecutado a su elegido." };
   }
   // Gemela malvada: si se ejecuta a su gemelo bueno, gana el Mal.
   const twin = goodTwin(game);
