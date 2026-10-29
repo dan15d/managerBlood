@@ -6,7 +6,7 @@ import { phaseLabel } from "@domain/services/GameRules";
 import { shuffle, type RandomFn } from "@domain/services/Random";
 import { applySetupEffects, seatMarionette } from "@domain/services/SetupGenerator";
 import { gameCharacterIds, jinxesAmong } from "@domain/services/SpecialRules";
-import { validateSelection } from "@domain/services/SetupRules";
+import { isDealt, validateSelection } from "@domain/services/SetupRules";
 import type { AiStoryteller } from "../ports/AiStoryteller";
 import type { CharacterCatalog } from "../ports/CharacterCatalog";
 import type { CharacterGuideSource } from "../ports/CharacterGuides";
@@ -59,8 +59,10 @@ export class CreateGame {
 
     const seatsForBag = names.map((_, seat) => seat).filter((seat) => !travellerSeats.includes(seat));
     const assignment = input.assignment ?? {};
+    // Lo que no se reparte (Lil' Monsta) queda en juego sin jugador.
+    const extraCharacterIds = bag.filter((c) => !isDealt(c)).map((c) => c.id);
     // Lo que queda en la bolsa tras quitar lo asignado a mano (puede haber fichas repetidas con el Papa).
-    const left = [...input.characterIds];
+    const left = bag.filter(isDealt).map((c) => c.id);
     for (const id of Object.values(assignment)) {
       const i = left.indexOf(id);
       if (i >= 0) left.splice(i, 1);
@@ -102,6 +104,7 @@ export class CreateGame {
       scriptCharacterIds: input.script.characterIds,
       players,
       fabledIds: fabled.map((c) => c.id),
+      extraCharacterIds,
       demonBluffs: input.bluffIds.slice(0, 3),
       phase: { kind: "night", number: 1 },
       nightStep: 0,

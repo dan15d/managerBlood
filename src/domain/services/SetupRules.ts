@@ -78,8 +78,15 @@ export interface SetupModifier {
   noEvil?: boolean;
   /** Cuántas fichas iguales puede haber en la bolsa (Tonto del pueblo). */
   copies?: number;
+  /** El hueco del Demonio lo ocupa un Esbirro más (Lil' Monsta). */
+  demonToMinion?: boolean;
+  /** Está en juego pero su ficha no va a la bolsa: no lo tiene ningún jugador (Lil' Monsta). */
+  outOfBag?: boolean;
   note: string;
 }
+
+/** Personajes cuya ficha va a la bolsa y se reparte a un jugador. */
+export const isDealt = (c: Character) => TEAMS_IN_BAG.includes(c.team) && !SETUP_MODIFIERS[c.id]?.outOfBag;
 
 export const SETUP_MODIFIERS: Record<string, SetupModifier> = {
   baron: { outsiders: [2], note: "+2 Forasteros" },
@@ -90,7 +97,7 @@ export const SETUP_MODIFIERS: Record<string, SetupModifier> = {
   hermit: { outsiders: [0, -1], note: "−0 o −1 Forastero" },
   sentinel: { outsiders: [-1, 0, 1], note: "−1, +0 o +1 Forastero" },
   xaan: { outsiders: [1, 2, 3], note: "Forasteros = X" },
-  lilmonsta: { minions: [1], note: "+1 Esbirro" },
+  lilmonsta: { demonToMinion: true, outOfBag: true, note: "No va en la bolsa: +1 Esbirro" },
   lordoftyphon: { minions: [1], note: "+1 Esbirro" },
   huntsman: { requires: ["damsel"], note: "+la Damisela" },
   choirboy: { requires: ["king"], note: "+el Rey" },
@@ -139,6 +146,10 @@ export function allowedDistributions(playerCount: number, characters: Character[
   let options: Distribution[] = [base];
   const mods = [...new Set(characters.map((c) => c.id))].map((id) => SETUP_MODIFIERS[id]).filter(Boolean);
   for (const mod of mods) {
+    if (mod.demonToMinion) {
+      options = options.map((d) => ({ ...d, minion: d.minion + d.demon, demon: 0 }));
+      continue;
+    }
     if (mod.noEvil || mod.noDemon) {
       options = options.map((d) => {
         const removed = mod.noEvil ? d.minion + d.demon : d.demon;
@@ -174,7 +185,7 @@ export const sameDistribution = (a: Distribution, b: Distribution) =>
 export function validateSelection(playerCount: number, characters: Character[]): SetupIssue[] {
   const issues: SetupIssue[] = [];
   const bagSize = Math.min(playerCount, MAX_BAG_PLAYERS);
-  const inBag = characters.filter((c) => TEAMS_IN_BAG.includes(c.team));
+  const inBag = characters.filter(isDealt);
   const counts = countByTeam(inBag);
   const ids = new Set(inBag.map((c) => c.id));
 
@@ -184,7 +195,7 @@ export function validateSelection(playerCount: number, characters: Character[]):
       message: `Hay ${inBag.length} personajes en la bolsa y deben ser ${bagSize}.`,
     });
   }
-  const withoutDemon = inBag.some((c) => SETUP_MODIFIERS[c.id]?.noDemon || SETUP_MODIFIERS[c.id]?.noEvil);
+  const withoutDemon = characters.some((c) => SETUP_MODIFIERS[c.id]?.noDemon || SETUP_MODIFIERS[c.id]?.noEvil || SETUP_MODIFIERS[c.id]?.demonToMinion);
   if (counts.demon < 1 && !withoutDemon) issues.push({ level: "error", message: "Falta el Demonio." });
 
   const options = allowedDistributions(playerCount, characters);
@@ -230,7 +241,7 @@ export function validateSelection(playerCount: number, characters: Character[]):
 /** Lo que se espera para cada equipo con lo que ya se ha elegido (para los contadores de la UI). */
 export function targetDistribution(playerCount: number, characters: Character[]): Distribution {
   const options = allowedDistributions(playerCount, characters);
-  const counts = countByTeam(characters.filter((c) => TEAMS_IN_BAG.includes(c.team)));
+  const counts = countByTeam(characters.filter(isDealt));
   return options.find((d) => sameDistribution(d, counts)) ?? options[0];
 }
 

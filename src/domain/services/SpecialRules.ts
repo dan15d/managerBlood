@@ -42,5 +42,6 @@ export const gameCharacterIds = (game: Game) => [
   ...new Set([
     ...game.players.flatMap((p) => [p.characterId, p.shownCharacterId].filter((id): id is string => !!id)),
     ...(game.fabledIds ?? []),
+    ...(game.extraCharacterIds ?? []),
   ]),
 ];

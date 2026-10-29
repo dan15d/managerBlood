@@ -1,6 +1,17 @@
 import type { Alignment, Character } from "../entities/Character";
 import type { Game, Nomination, Phase, Player, ReminderToken } from "../entities/Game";
 import { RuleViolation } from "../errors";
+import {
+  demonPlayers,
+  LEVIATHAN_GOOD_EXECUTED,
+  LILMONSTA_BABYSITTER,
+  lleechHost,
+  reallyAlive,
+  reminderFrom,
+  ZOMBUUL_REALLY_DEAD,
+  ZOMBUUL_SEEMS_DEAD,
+  zombuulSeemsDead,
+} from "./Demons";
 
 // Reglas del Grimorio: funciones puras que devuelven una partida nueva. No guardan nada
 // ni conocen la interfaz; los casos de uso se encargan de persistir el resultado.
@@ -27,16 +38,66 @@ export const alivePlayers = (game: Game) => game.players.filter((p) => p.alive);
 
 // ---------- Vida y muerte ----------
 
+/** Apunta la muerte: de noche no se anuncia hasta el amanecer; de día cuenta para el Zombuul. */
+const recordDeath = (game: Game, playerId: string): Game =>
+  game.phase.kind === "night"
+    ? { ...game, nightDeaths: [...(game.nightDeaths ?? []), playerId] }
+    : { ...game, dayDeaths: [...(game.dayDeaths ?? []), playerId] };
+
+const withReminder = (game: Game, playerId: string, source: string, label: string): Game =>
+  updatePlayer(game, playerId, (p) => ({ ...p, reminders: [...p.reminders, reminderFrom(source, label, `${playerId}:${source}:${label}`)] }));
+
+/**
+ * Un jugador muere. Casos de Demonios:
+ * - Zombuul: la primera vez parece muerto (para la mesa lo está) pero sigue vivo; la segunda, muere.
+ * - Lleech: no muere mientras su huésped siga vivo; si muere el huésped, el Lleech muere con él.
+ */
 export function killPlayer(game: Game, playerId: string, cause = "ha muerto"): Game {
   const player = findPlayer(game, playerId);
-  if (!player?.alive) return game;
-  return touch(updatePlayer(game, playerId, (p) => ({ ...p, alive: false })), `${player.name} ${cause}.`);
+  if (!player) return game;
+  const zombuul = player.characterId === "zombuul";
+  const seemedDead = zombuul && player.reminders.some((r) => r.sourceCharacterId === "zombuul" && r.label === ZOMBUUL_SEEMS_DEAD);
+  const reallyDead = player.reminders.some((r) => r.sourceCharacterId === "zombuul" && r.label === ZOMBUUL_REALLY_DEAD);
+  if (seemedDead && !reallyDead) {
+    const dead = withReminder(updatePlayer(game, playerId, (p) => ({ ...p, alive: false })), playerId, "zombuul", ZOMBUUL_REALLY_DEAD);
+    return touch(player.alive ? recordDeath(dead, playerId) : dead, `${player.name} ${cause}: el Zombuul muere de verdad.`);
+  }
+  if (!player.alive) return game;
+
+  const host = player.characterId === "lleech" ? lleechHost(game) : undefined;
+  if (host?.alive && host.id !== playerId) {
+    return touch(game, `${player.name} no muere: el Lleech vive mientras su huésped (${host.name}) siga vivo.`);
+  }
+
+  let next = recordDeath(updatePlayer(game, playerId, (p) => ({ ...p, alive: false })), playerId);
+  if (zombuul) {
+    next = touch(withReminder(next, playerId, "zombuul", ZOMBUUL_SEEMS_DEAD), `${player.name} ${cause}… pero es el Zombuul: parece muerto y sigue vivo.`);
+  } else {
+    next = touch(next, `${player.name} ${cause}.`);
+  }
+
+  // Si era el huésped del Lleech, el Lleech muere con él.
+  if (lleechHost(next)?.id === playerId) {
+    for (const lleech of next.players.filter((p) => p.characterId === "lleech" && p.alive)) {
+      next = killPlayer(next, lleech.id, "muere con su huésped");
+    }
+  }
+  return next;
 }
 
 export function revivePlayer(game: Game, playerId: string): Game {
   const player = findPlayer(game, playerId);
   if (!player || player.alive) return game;
-  return touch(updatePlayer(game, playerId, (p) => ({ ...p, alive: true, ghostVoteUsed: false })), `${player.name} vuelve a la vida.`);
+  const alive = updatePlayer(game, playerId, (p) => ({
+    ...p,
+    alive: true,
+    ghostVoteUsed: false,
+    reminders: p.reminders.filter((r) => r.label !== ZOMBUUL_REALLY_DEAD),
+  }));
+  return touch(
+    { ...alive, nightDeaths: game.nightDeaths?.filter((id) => id !== playerId), dayDeaths: game.dayDeaths?.filter((id) => id !== playerId) },
+    `${player.name} vuelve a la vida.`,
+  );
 }
 
 export function setCharacter(game: Game, playerId: string, character: Character, keepAlignment = false): Game {
@@ -130,8 +191,12 @@ export const DUSK_REMINDERS = new Set([
   "custom:Muerto esta noche",
 ]);
 
-/** Las muertes de una noche («Muerto» de cualquier Demonio o personaje que mata) también caducan. */
-const isDuskReminder = (r: ReminderToken) => DUSK_REMINDERS.has(`${r.sourceCharacterId}:${r.label}`) || r.label === "Muerto";
+/**
+ * Las muertes de una noche («Muerto» de cualquier Demonio o personaje que mata) también caducan,
+ * salvo las del Shabaloth: marcan a quién puede regurgitar la noche siguiente (y se mueven solas).
+ */
+const isDuskReminder = (r: ReminderToken) =>
+  DUSK_REMINDERS.has(`${r.sourceCharacterId}:${r.label}`) || (r.label === "Muerto" && r.sourceCharacterId !== "shabaloth");
 
 export const expiringReminders = (game: Game) =>
   game.players.flatMap((p) => p.reminders.filter(isDuskReminder).map((reminder) => ({ playerId: p.id, reminder })));
@@ -159,10 +224,19 @@ export function swapSeats(game: Game, a: string, b: string): Game {
 
 // ---------- Fases ----------
 
+/** Amanece: se anuncian las muertes de la noche (desde ahora la mesa las ve). */
 export function startDay(game: Game): Game {
   if (game.phase.kind !== "night") throw new RuleViolation("Ya es de día.");
-  const next = { ...game, phase: { kind: "day", number: game.phase.number } as Phase, nominations: [], executedToday: undefined };
-  return touch(next, "Amanece.");
+  const died = (game.nightDeaths ?? []).map((id) => findPlayer(game, id)?.name).filter(Boolean);
+  const next = {
+    ...game,
+    phase: { kind: "day", number: game.phase.number } as Phase,
+    nominations: [],
+    executedToday: undefined,
+    nightDeaths: [],
+    dayDeaths: [],
+  };
+  return touch(next, died.length ? `Amanece. Han muerto esta noche: ${died.join(", ")}.` : "Amanece. Nadie ha muerto esta noche.");
 }
 
 export function startNight(game: Game): Game {
@@ -271,7 +345,12 @@ export function execute(game: Game, playerId: string): Game {
   if (game.executedToday) throw new RuleViolation("Solo hay una ejecución al día.");
   const player = findPlayer(game, playerId);
   if (!player) throw new RuleViolation("Ese jugador no está en la partida.");
-  const after = player.alive ? killPlayer(game, playerId, "es ejecutado") : touch(game, `${player.name} es ejecutado (ya estaba muerto).`);
+  // El Zombuul que solo parecía muerto sí muere al ser ejecutado.
+  let after =
+    player.alive || zombuulSeemsDead(player) ? killPlayer(game, playerId, "es ejecutado") : touch(game, `${player.name} es ejecutado (ya estaba muerto).`);
+  // El Leviatán cuenta los buenos ejecutados: con el segundo, gana el Mal.
+  const leviathan = after.players.some((p) => p.characterId === "leviathan" && reallyAlive(p));
+  if (leviathan && player.alignment === "good") after = withReminder(after, playerId, "leviathan", LEVIATHAN_GOOD_EXECUTED);
   return { ...after, executedToday: playerId };
 }
 
@@ -291,6 +370,8 @@ export interface DemonSuccession {
   reason: string;
   /** Algo que puede impedirlo (la Mujer escarlata está envenenada o borracha). */
   caveat?: string;
+  /** El «Demonio» muerto era quien cuidaba a Lil' Monsta: el heredero pasa a cuidarlo. */
+  babysitter?: boolean;
 }
 
 const DISABLED_REMINDER = /envenen|borrach|sin habilidad/i;
@@ -304,11 +385,13 @@ const DISABLED_REMINDER = /envenen|borrach|sin habilidad/i;
 export function demonSuccession(game: Game, characters: Map<string, Character>): DemonSuccession | null {
   if (game.status === "finished") return null;
   const team = (p: Player) => characters.get(p.characterId)?.team;
-  const demons = game.players.filter((p) => team(p) === "demon");
-  if (!demons.length || demons.some((d) => d.alive)) return null;
+  const demons = demonPlayers(game, characters);
+  if (!demons.length || demons.some(reallyAlive)) return null;
   const demon = demons[0];
-  const demonName = characters.get(demon.characterId)?.name ?? "el Demonio";
-  const aliveAfter = alivePlayers(game).filter((p) => team(p) !== "traveller").length;
+  // Si el muerto cuidaba a Lil' Monsta, lo que se hereda es cuidarlo.
+  const babysitter = team(demon) !== "demon";
+  const demonName = babysitter ? "Lil' Monsta" : (characters.get(demon.characterId)?.name ?? "el Demonio");
+  const aliveAfter = game.players.filter((p) => reallyAlive(p) && team(p) !== "traveller").length;
 
   const scarlet = game.players.find((p) => p.characterId === "scarletwoman" && p.alive);
   if (scarlet && aliveAfter >= 4) {
@@ -316,8 +399,11 @@ export function demonSuccession(game: Game, characters: Map<string, Character>):
     return {
       demon,
       heirs: [scarlet],
-      reason: `Ha muerto el Demonio (${demonName}) con ${aliveAfter + 1} jugadores vivos: la Mujer escarlata se convierte en el nuevo Demonio y la partida sigue.`,
+      reason: babysitter
+        ? `Ha muerto quien cuidaba a Lil' Monsta con ${aliveAfter + 1} jugadores vivos: la Mujer escarlata cuida a Lil' Monsta el resto de la partida.`
+        : `Ha muerto el Demonio (${demonName}) con ${aliveAfter + 1} jugadores vivos: la Mujer escarlata se convierte en el nuevo Demonio y la partida sigue.`,
       caveat: disabled ? `La Mujer escarlata tiene «${disabled.label}»: si de verdad no tiene habilidad, ganan los buenos.` : undefined,
+      babysitter,
     };
   }
 
@@ -334,9 +420,148 @@ export function demonSuccession(game: Game, characters: Map<string, Character>):
   return null;
 }
 
-/** El heredero pasa a ser el Demonio que ha muerto (con su habilidad y su bando). */
+// ---------- Ataque del Demonio ----------
+
+/** Protecciones que impiden morir por el Demonio esta noche (Monje, Posadero, Dama del té…). */
+const PROTECTION = /^(a salvo|protegido|no puede morir)$/i;
+
+/** El recordatorio «Muerto» de un Demonio: el jugador elegido muere esta noche. */
+export const isDemonKill = (reminder: Pick<ReminderToken, "sourceCharacterId" | "label">, characters: Map<string, Character>) =>
+  reminder.label === "Muerto" && characters.get(reminder.sourceCharacterId)?.team === "demon";
+
+export type DemonKillOutcome = "killed" | "protected" | "selfKill" | "mayor" | "jump";
+
+const isProtected = (target: Player) => {
+  const healthy = !target.reminders.some((r) => DISABLED_REMINDER.test(r.label));
+  return (target.characterId === "soldier" && healthy) || target.reminders.some((r) => PROTECTION.test(r.label));
+};
+
+/**
+ * El Demonio ataca: el jugador muere en ese momento (se anuncia al amanecer), salvo que esté
+ * protegido (Soldado sano, «A salvo», «Protegido», «No puede morir»). Si el Demonio se elige a sí
+ * mismo, muere y demonSuccession ofrece el heredero. Al Alcalde se le avisa: puede morir otro.
+ * Fang Gu: el primer Forastero que elige se convierte en Fang Gu malo y el Fang Gu muere en su lugar.
+ */
+export function demonKill(
+  game: Game,
+  targetId: string,
+  reminder: ReminderToken,
+  copies: number,
+  characters: Map<string, Character>,
+): { game: Game; outcome: DemonKillOutcome } {
+  const target = findPlayer(game, targetId);
+  if (!target) throw new RuleViolation("Ese jugador no está en la partida.");
+  if (isProtected(target)) return { game, outcome: "protected" };
+  const demonCharacter = characters.get(reminder.sourceCharacterId);
+  const demon = demonCharacter?.name ?? "el Demonio";
+
+  if (reminder.sourceCharacterId === "fanggu" && characters.get(target.characterId)?.team === "outsider" && target.alive) {
+    const jumped = game.players.some((p) => p.reminders.some((r) => r.sourceCharacterId === "fanggu" && r.label === "Primera vez"));
+    const fangGu = game.players.find((p) => p.characterId === "fanggu" && p.alive);
+    // Un Fang Gu protegido no salta: el Forastero muere sin más.
+    if (!jumped && fangGu && !isProtected(fangGu) && demonCharacter) {
+      let next = killPlayer(game, fangGu.id, `muere: salta a ${target.name}`);
+      next = setCharacter(next, targetId, demonCharacter);
+      next = withReminder(next, targetId, "fanggu", "Primera vez");
+      return { game: next, outcome: "jump" };
+    }
+  }
+
+  const self = target.characterId === reminder.sourceCharacterId;
+  const next = killPlayer(placeReminder(game, targetId, reminder, copies), targetId, self ? `se mata a sí mismo (${demon})` : `muere por ${demon}`);
+  return { game: next, outcome: self ? "selfKill" : target.characterId === "mayor" ? "mayor" : "killed" };
+}
+
+/**
+ * Pukka: el elegido queda envenenado y el envenenado anterior muere (salvo protección) y queda
+ * sano. Solo hay una víctima envenenada viva a la vez.
+ */
+export function pukkaChoose(game: Game, targetId: string, reminder: ReminderToken): { game: Game; died: Player[]; saved: Player[] } {
+  const isPukkaPoison = (r: ReminderToken) => r.sourceCharacterId === "pukka" && r.label === "Envenenado";
+  const previous = game.players.filter((p) => p.reminders.some(isPukkaPoison));
+  let next = game;
+  const died: Player[] = [];
+  const saved: Player[] = [];
+  for (const p of previous) {
+    // Deja de estar envenenado: muere (si no está protegido) y después está sano.
+    next = updatePlayer(next, p.id, (x) => ({ ...x, reminders: x.reminders.filter((r) => !isPukkaPoison(r)) }));
+    if (!p.alive) continue;
+    if (isProtected(p)) saved.push(p);
+    else {
+      next = killPlayer(next, p.id, "muere por el veneno del Pukka");
+      died.push(p);
+    }
+  }
+  return { game: addReminder(next, targetId, reminder), died, saved };
+}
+
+/** Tantas fichas de recordatorio como tiene el personaje en su ficha (0: sin límite). */
+const reminderCopies = (reminder: ReminderToken, characters: Map<string, Character>) =>
+  characters.get(reminder.sourceCharacterId)?.reminders.filter((l) => l === reminder.label).length ?? 0;
+
+/**
+ * Poner el recordatorio de lo que elige un personaje por la noche y aplicar lo que provoca:
+ * el ataque del Demonio, el veneno del Pukka, el «Vivo» del Shabaloth… Devuelve también el
+ * aviso para el Narrador.
+ */
+export function applyReminderChoice(
+  game: Game,
+  targetId: string,
+  reminder: ReminderToken,
+  characters: Map<string, Character>,
+): { game: Game; message: string } {
+  const target = findPlayer(game, targetId);
+  if (!target) throw new RuleViolation("Ese jugador no está en la partida.");
+  const copies = reminderCopies(reminder, characters);
+  const night = game.phase.kind === "night";
+
+  if (night && reminder.sourceCharacterId === "pukka" && reminder.label === "Envenenado") {
+    const r = pukkaChoose(game, targetId, reminder);
+    const parts = [`${target.name} está envenenado por el Pukka.`];
+    if (r.died.length) parts.push(`${r.died.map((p) => p.name).join(", ")} muere por el veneno (se anunciará al amanecer).`);
+    if (r.saved.length) parts.push(`${r.saved.map((p) => p.name).join(", ")} estaba protegido: no muere y queda sano.`);
+    return { game: r.game, message: parts.join(" ") };
+  }
+
+  if (reminder.sourceCharacterId === "shabaloth" && reminder.label === "Vivo") {
+    const regurgitated = updatePlayer(revivePlayer(game, targetId), targetId, (p) => ({
+      ...p,
+      reminders: p.reminders.filter((r) => !(r.sourceCharacterId === "shabaloth" && r.label === "Muerto")),
+    }));
+    return { game: placeReminder(regurgitated, targetId, reminder, copies), message: `El Shabaloth regurgita a ${target.name}: vuelve a la vida.` };
+  }
+
+  if (night && isDemonKill(reminder, characters)) {
+    const { game: next, outcome } = demonKill(game, targetId, reminder, copies, characters);
+    const demon = characters.get(reminder.sourceCharacterId)?.name ?? "el Demonio";
+    const message = {
+      protected: `${target.name} está a salvo y no muere. Si la protección no funciona (borracho, envenenado…), márcalo muerto en el Amanecer.`,
+      selfKill: `${target.name} se ha elegido a sí mismo y muere: elige arriba quién es el nuevo Demonio.`,
+      mayor: `${target.name} es el Alcalde: puede morir otro en su lugar. Si lo decides, deshaz y elige a ese jugador.`,
+      jump: `${demon} salta: ${target.name} es el nuevo ${demon} (malo) y el anterior muere. Despiértalo y enséñale TÚ ERES, ${demon} y el pulgar hacia abajo.`,
+      killed: next.players.find((p) => p.id === targetId)?.alive
+        ? `${target.name} no muere esta vez.`
+        : `${target.name} muere esta noche. Se anunciará al amanecer.`,
+    }[outcome];
+    return { game: next, message };
+  }
+
+  const placed = game.players.filter((p) => p.reminders.some((r) => r.sourceCharacterId === reminder.sourceCharacterId && r.label === reminder.label));
+  const from = copies > 0 && placed.length >= copies ? placed[0] : undefined;
+  return {
+    game: placeReminder(game, targetId, reminder, copies),
+    message: from && from.id !== targetId ? `«${reminder.label}» pasa de ${from.name} a ${target.name}.` : `«${reminder.label}» en ${target.name}.`,
+  };
+}
+
+/** El heredero pasa a ser el Demonio que ha muerto (o a cuidar a Lil' Monsta). */
 export function succeedDemon(game: Game, succession: DemonSuccession, heirId: string, characters: Map<string, Character>): Game {
   if (!succession.heirs.some((h) => h.id === heirId)) throw new RuleViolation("Ese jugador no puede pasar a ser el Demonio.");
+  if (succession.babysitter) {
+    const heir = findPlayer(game, heirId)!;
+    const moved = placeReminder(game, heirId, reminderFrom("lilmonsta", LILMONSTA_BABYSITTER, `${heirId}:lilmonsta`), 1);
+    return touch(moved, `${heir.name} pasa a cuidar a Lil' Monsta.`);
+  }
   const demon = characters.get(succession.demon.characterId);
   if (!demon) throw new RuleViolation("No encuentro el personaje del Demonio.");
   return setCharacter(game, heirId, demon);
@@ -345,16 +570,33 @@ export function succeedDemon(game: Game, succession: DemonSuccession, heirId: st
 /**
  * Sugerencia de final según las reglas básicas. El Narrador decide: hay personajes
  * (Alcalde, Santo…) que cambian quién gana. Si hay un heredero del Demonio, la partida sigue.
+ * El Zombuul que solo parece muerto sigue vivo; quien cuida a Lil' Monsta es el Demonio.
  */
 export function victoryHint(game: Game, characters: Map<string, Character>): VictoryHint | null {
   if (game.status === "finished") return null;
-  const demons = game.players.filter((p) => characters.get(p.characterId)?.team === "demon");
-  if (demons.length && demons.every((d) => !d.alive)) {
+  const demons = demonPlayers(game, characters);
+  if (demons.length && !demons.some(reallyAlive)) {
     if (demonSuccession(game, characters)) return null;
     return { winner: "good", reason: "El Demonio ha muerto." };
   }
-  const alive = alivePlayers(game).filter((p) => characters.get(p.characterId)?.team !== "traveller");
+  const leviathan = game.players.some((p) => p.characterId === "leviathan" && reallyAlive(p));
+  const goodExecuted = game.players.filter((p) => p.reminders.some((r) => r.label === LEVIATHAN_GOOD_EXECUTED)).length;
+  if (leviathan && goodExecuted >= 2) return { winner: "evil", reason: "Con Leviatán en juego se ha ejecutado a un segundo jugador bueno." };
+  const alive = game.players.filter((p) => reallyAlive(p) && characters.get(p.characterId)?.team !== "traveller");
   if (alive.length <= 2) return { winner: "evil", reason: "Solo quedan dos jugadores vivos." };
+  return null;
+}
+
+/**
+ * Victorias que se deciden al terminar el día:
+ * - Vortox vivo y nadie ejecutado hoy: gana el Mal.
+ * - Leviatán vivo al terminar el día 5 (o más): gana el Mal.
+ */
+export function duskVictory(game: Game): VictoryHint | null {
+  if (game.status === "finished" || game.phase.kind !== "day") return null;
+  const alive = (id: string) => game.players.some((p) => p.characterId === id && reallyAlive(p));
+  if (alive("vortox") && !game.executedToday) return { winner: "evil", reason: "Con Vortox vivo, un día sin ejecución hace ganar al Mal." };
+  if (alive("leviathan") && game.phase.number >= 5) return { winner: "evil", reason: `Termina el día ${game.phase.number} y Leviatán sigue vivo.` };
   return null;
 }
 

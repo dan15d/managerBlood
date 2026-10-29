@@ -12,7 +12,7 @@ import { INFO_HEADINGS, ShowCard } from "../../components/ShowCard";
 import { Token } from "../../components/Token";
 import { NIGHT_ICONS } from "../../wikiAssets";
 import { ChevronLeft, ChevronRight, Eye, Lightbulb, Pointer, Skull, Sun, TriangleAlert, VenetianMask } from "lucide-react";
-import { CHOICE_REMINDER, infoHints } from "@domain/services/NightInfo";
+import { choiceReminder, infoHints } from "@domain/services/NightInfo";
 
 interface Props {
   game: Game;
@@ -55,7 +55,7 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
   const disabled = step.playerIds.map(player).filter((p) => p.reminders.some((r) => DISABLING.test(r.label)));
   const hints = step.character ? infoHints(game, step.character, characters) : [];
   // Recordatorio de quien elige jugador cada noche (Envenenador, Monje, Demonio…).
-  const chooser = step.character && step.playerIds.length > 0 ? CHOICE_REMINDER[step.character.id] : undefined;
+  const chooser = step.character && step.playerIds.length > 0 ? choiceReminder(step.character.id, game.phase.number === 1) : undefined;
   const otherReminders = [...new Set(step.character?.reminders ?? [])].filter((label) => label !== chooser);
 
   return (
@@ -131,7 +131,7 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
         {hints.length > 0 && (
           <div className="info-hint" role="note">
             <span className="info-hint__title">
-              <Lightbulb /> Respuesta verdadera
+              <Lightbulb /> Según el Grimorio
             </span>
             {hints.map((h) => (
               <p key={h.playerId} style={{ margin: 0 }}>
@@ -249,7 +249,10 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
 
         {step.kind === "dawn" && (
           <div className="stack" style={{ gap: 6 }}>
-            <span className="small muted">¿Quién ha muerto esta noche? Toca para marcarlo:</span>
+            <span className="small muted">
+              ¿Quién ha muerto esta noche? Los que ha matado el Demonio ya están marcados; toca para cambiarlo. Los móviles de los
+              jugadores lo verán al empezar el día.
+            </span>
             <div className="chips">
               {game.players.map((p) => {
                 // Sugerencia: quien tenga un recordatorio de muerte puesto esta noche.

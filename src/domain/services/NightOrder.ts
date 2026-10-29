@@ -1,5 +1,6 @@
 import type { Character } from "../entities/Character";
 import type { Game, Player } from "../entities/Game";
+import { hasLilMonsta, reallyAlive } from "./Demons";
 import { TOR, TOYMAKER } from "./SpecialRules";
 
 export type NightStepKind = "dusk" | "minion_info" | "demon_info" | "character" | "dawn";
@@ -51,7 +52,8 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
     },
   });
 
-  if (first && hasEvilInfo(seated, game.fabledIds)) {
+  // Con Lil' Monsta no hay información de Esbirros ni de Demonio: se conocen en su paso.
+  if (first && hasEvilInfo(seated, game.fabledIds) && !hasLilMonsta(game)) {
     const minions = game.players.filter((p) => team(p) === "minion");
     const demons = game.players.filter((p) => team(p) === "demon");
     steps.push({
@@ -86,6 +88,8 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
   }
   // Las Fábulas y Lóricos no son jugadores: su paso lo hace el Narrador (anunciar, poner recordatorios…).
   for (const id of game.fabledIds ?? []) if (!byCharacter.has(id)) byCharacter.set(id, []);
+  // Lil' Monsta no lo tiene nadie: en su paso despiertan los Esbirros para elegir quién lo cuida.
+  if (hasLilMonsta(game)) byCharacter.set("lilmonsta", game.players.filter((p) => team(p) === "minion"));
   for (const [id, players] of byCharacter) {
     const c = characters.get(id);
     if (!c) continue;
@@ -102,7 +106,7 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
         playerIds: players.map((p) => p.id),
         deceivedPlayerIds: deceived,
         character: c,
-        dead: players.length > 0 && players.every((p) => !p.alive),
+        dead: players.length > 0 && players.every((p) => !reallyAlive(p)),
       },
     });
   }

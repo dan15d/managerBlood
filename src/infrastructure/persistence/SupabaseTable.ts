@@ -2,7 +2,7 @@ import type { AdminAuth, LobbyGateway, PlayerGateway, TablePublisher, Unsubscrib
 import type { Character } from "@domain/entities/Character";
 import type { Game } from "@domain/entities/Game";
 import type { Lobby, PlayerView, PublicPlayer, Seat, TableStatus } from "@domain/entities/Table";
-import { publicPhase, publicPlayers, seatSecret } from "@domain/services/TableView";
+import { publicAlive, publicPhase, publicPlayers, seatSecret } from "@domain/services/TableView";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fail, ownerId } from "./SupabaseRepositories";
 
@@ -197,7 +197,7 @@ export class SupabaseTablePublisher implements TablePublisher {
         user_id: p.userId ?? null,
         shown_character_id: secret.characterId ?? null,
         shown_alignment: secret.alignment ?? null,
-        alive: p.alive,
+        alive: publicAlive(game, p),
         ghost_vote_used: p.ghostVoteUsed,
       };
     });

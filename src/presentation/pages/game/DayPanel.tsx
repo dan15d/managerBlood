@@ -18,6 +18,8 @@ export function DayPanel({ game, characters, onChange, onStartNomination }: Prop
   const [confirmDusk, setConfirmDusk] = useState(false);
   /** Recordatorios marcados para quitar al anochecer (null: la hoja está cerrada). */
   const [cleaning, setCleaning] = useState<string[] | null>(null);
+  /** Motivo por el que el Mal gana al anochecer (null: no hay). */
+  const [duskWin, setDuskWin] = useState<string | null>(null);
   const name = (id: string) => game.players.find((p) => p.id === id)?.name ?? "?";
   const threshold = rules.voteThreshold(game);
   const open = game.nominations.find((n) => !n.closed);
@@ -38,9 +40,15 @@ export function DayPanel({ game, characters, onChange, onStartNomination }: Prop
     }
     onChange(rules.startNight);
   };
+  // Victorias que se deciden al acabar el día (Vortox sin ejecución, Leviatán tras el día 5).
+  const checkDuskVictory = () => {
+    const win = rules.duskVictory(game);
+    if (win) setDuskWin(win.reason);
+    else goToNight();
+  };
   const endDay = () => {
     if (block && !game.executedToday) setConfirmDusk(true);
-    else goToNight();
+    else checkDuskVictory();
   };
 
   return (
@@ -149,10 +157,38 @@ export function DayPanel({ game, characters, onChange, onStartNomination }: Prop
           confirmLabel="Anochecer sin ejecutar"
           onConfirm={() => {
             setConfirmDusk(false);
-            goToNight();
+            checkDuskVictory();
           }}
           onCancel={() => setConfirmDusk(false)}
         />
+      )}
+      {duskWin && (
+        <Sheet onClose={() => setDuskWin(null)} title="¿Gana el Mal?" label="Victoria del Mal al anochecer">
+          <p style={{ marginTop: 0 }}>{duskWin}</p>
+          <p className="muted small">
+            Si su habilidad no funciona hoy (está borracho o envenenado), la partida sigue.
+          </p>
+          <div className="action-bar action-bar--sheet">
+            <button
+              className="btn"
+              onClick={() => {
+                setDuskWin(null);
+                goToNight();
+              }}
+            >
+              <Moon /> La partida sigue
+            </button>
+            <button
+              className="btn btn--gold"
+              onClick={() => {
+                setDuskWin(null);
+                onChange((g) => rules.declareWinner(g, "evil"));
+              }}
+            >
+              Gana el Mal
+            </button>
+          </div>
+        </Sheet>
       )}
       {cleaning && (
         <Sheet onClose={() => setCleaning(null)} title="Antes de anochecer" label="Recordatorios que caducan">

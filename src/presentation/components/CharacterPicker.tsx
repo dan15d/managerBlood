@@ -45,7 +45,8 @@ export function CharacterPicker({ characters, selected, onToggle, target, teams 
       {teams.map((team) => {
         const list = visible.filter((c) => c.team === team);
         if (!list.length) return null;
-        const count = selected.filter((id) => characters.some((c) => c.id === id && c.team === team)).length;
+        // Lo que no va a la bolsa (Lil' Monsta) no cuenta para el reparto.
+        const count = selected.filter((id) => !SETUP_MODIFIERS[id]?.outOfBag && characters.some((c) => c.id === id && c.team === team)).length;
         const want = target && team in target ? target[team as keyof Distribution] : undefined;
         return (
           <section key={team} className="team-section">

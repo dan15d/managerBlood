@@ -52,10 +52,14 @@ export const CHOICE_REMINDER: Record<string, string> = {
   kazali: "Muerto",
   lordoftyphon: "Muerto",
   legion: "Muerto",
-  lilmonsta: "Muerto",
+  lilmonsta: "Es el Demonio",
   yaggababble: "Muerto",
   alhadikhia: "1",
 };
+
+/** Lo que pone quien elige esta noche: el Lleech, la primera noche, envenena a su huésped. */
+export const choiceReminder = (characterId: string, firstNight: boolean): string | undefined =>
+  characterId === "lleech" && firstNight ? "Envenenado" : CHOICE_REMINDER[characterId];
 
 const label = (p: Player, characters: Map<string, Character>) => `${p.seat + 1}. ${p.name} (${characters.get(p.characterId)?.name ?? "?"})`;
 
@@ -145,6 +149,11 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
         const herring = game.players.find((p) => p.reminders.some((r) => r.sourceCharacterId === "fortuneteller"));
         const yes = [...demons, ...(herring ? [herring] : [])].map((p) => `${p.seat + 1}. ${p.name}`);
         return `Responde SÍ si elige a ${yes.join(" o ")}${herring ? " (pista falsa incluida)" : ""}.${herring ? "" : " Falta poner la pista falsa en un jugador bueno."}`;
+      }
+      case "zombuul": {
+        // Solo ataca si nadie ha muerto durante el día (también cuenta su propia muerte aparente).
+        const died = (game.dayDeaths ?? []).map((id) => game.players.find((p) => p.id === id)?.name).filter(Boolean);
+        return died.length ? `Hoy ha muerto ${died.join(", ")}: no despiertes al Zombuul.` : "Hoy no ha muerto nadie: despierta al Zombuul para que elija.";
       }
       default:
         return null;

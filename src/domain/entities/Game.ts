@@ -61,6 +61,12 @@ export interface Game {
   nightStep: number;
   nominations: Nomination[];
   executedToday?: string;
+  /** Muertos esta noche: ya lo están en el Grimorio, pero la mesa no lo sabe hasta el amanecer. */
+  nightDeaths?: string[];
+  /** Muertos durante el día de hoy (el Zombuul solo ataca si no ha muerto nadie). */
+  dayDeaths?: string[];
+  /** Personajes en juego que no tiene ningún jugador (Lil' Monsta, que cuida un Esbirro). */
+  extraCharacterIds?: string[];
   status: GameStatus;
   winner?: Alignment;
   log: GameLogEntry[];

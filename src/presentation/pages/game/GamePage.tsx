@@ -142,12 +142,15 @@ export function GamePage() {
       return setPick({ kind: "seat" });
     }
     if (pick.kind === "reminder") {
-      // Tantas fichas como tiene el personaje: si ya están todas, la primera se mueve aquí.
-      const copies = characters.get(pick.sourceId)?.reminders.filter((l) => l === pick.label).length ?? 0;
-      const placed = game.players.filter((p) => p.reminders.some((r) => r.sourceCharacterId === pick.sourceId && r.label === pick.label));
-      const from = copies > 0 && placed.length >= copies ? placed[0] : undefined;
-      change((g) => rules.placeReminder(g, pid, { id: app.newId(), sourceCharacterId: pick.sourceId, label: pick.label }, copies));
-      toast(from && from.id !== pid ? `«${pick.label}» pasa de ${from.name} a ${name(pid)}.` : `«${pick.label}» en ${name(pid)}.`);
+      // Pone el recordatorio y aplica lo que provoca (ataque del Demonio, veneno del Pukka…).
+      const reminder = { id: app.newId(), sourceCharacterId: pick.sourceId, label: pick.label };
+      let message = "";
+      change((g) => {
+        const result = rules.applyReminderChoice(g, pid, reminder, characters);
+        message = result.message;
+        return result.game;
+      });
+      if (message) toast(message);
       return setPick(null);
     }
     if (pick.kind === "nominator") {

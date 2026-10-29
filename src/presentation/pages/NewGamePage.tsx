@@ -5,6 +5,7 @@ import type { Script } from "@domain/entities/Script";
 import type { Lobby, Seat } from "@domain/entities/Table";
 import {
   baseDistribution,
+  isDealt,
   MAX_PLAYERS,
   maxTravellers,
   MIN_PLAYERS,
@@ -133,6 +134,8 @@ export function NewGamePage() {
   const bagSeats = Array.from({ length: playerCount }, (_, seat) => seat).filter((seat) => !(seat in travellerBySeat));
   const bagAssignment = Object.fromEntries(Object.entries(assignment).filter(([seat]) => bagSeats.includes(Number(seat))));
   const chosen = selected.map((id) => app.catalog.get(id)!).filter(Boolean);
+  // Las fichas que se reparten (Lil' Monsta está en juego pero no va a la bolsa).
+  const dealtCount = chosen.filter(isDealt).length;
   const fabledChosen = fabled.map((id) => app.catalog.get(id)!).filter(Boolean);
   const issues = validateSelection(bagCount, [...chosen, ...fabledChosen]);
   const errors = issues.filter((i) => i.level === "error");
@@ -529,8 +532,8 @@ export function NewGamePage() {
                     Vaciar
                   </button>
                   <span className="spacer" />
-                  <span className={`counter ${selected.length === bagCount ? "counter--ok" : ""}`}>
-                    {selected.length}/{bagCount}
+                  <span className={`counter ${dealtCount === bagCount ? "counter--ok" : ""}`}>
+                    {dealtCount}/{bagCount}
                   </span>
                 </div>
               </div>
@@ -660,7 +663,7 @@ export function NewGamePage() {
                   >
                     <option value="">— Elige —</option>
                     {/* Cada ficha una vez, salvo las repetidas (Papa, Tonto del pueblo), que salen tantas veces como estén. */}
-                    {[...new Map(chosen.map((c) => [c.id, c])).values()]
+                    {[...new Map(chosen.filter(isDealt).map((c) => [c.id, c])).values()]
                       .filter(
                         (c) =>
                           bagAssignment[seat] === c.id ||

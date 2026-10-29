@@ -420,3 +420,41 @@ describe("nuevo Demonio: Mujer escarlata y pase del Diablillo", () => {
     expect(rules.victoryHint(day, map)?.winner).toBe("good");
   });
 });
+
+describe("ataque del Demonio de noche", () => {
+  // Asientos: Diablillo, Barón, Soldado, Monje, Empático, Mayordomo, Chef.
+  const ids = ["imp", "baron", "soldier", "monk", "empath", "butler", "chef"];
+  const map = catalog.map();
+  const night = () => game(ids, { phase: { kind: "night", number: 2 } });
+  const kill = (id: string) => ({ id, sourceCharacterId: "imp", label: "Muerto" });
+
+  it("el elegido muere en el acto, pero la mesa no lo ve hasta el amanecer", () => {
+    const { game: g, outcome } = rules.demonKill(night(), "p4", kill("k"), 1, map);
+    expect(outcome).toBe("killed");
+    expect(g.players[4].alive).toBe(false);
+    expect(publicPlayers(g, map)[4].alive).toBe(true);
+    const day = rules.startDay(g);
+    expect(publicPlayers(day, map)[4].alive).toBe(false);
+    expect(day.log[day.log.length - 1].text).toContain("Han muerto esta noche: J5");
+  });
+
+  it("el Soldado y los protegidos no mueren; un Soldado envenenado sí", () => {
+    expect(rules.demonKill(night(), "p2", kill("k"), 1, map).outcome).toBe("protected");
+    const safe = rules.addReminder(night(), "p6", { id: "s", sourceCharacterId: "monk", label: "A salvo" });
+    expect(rules.demonKill(safe, "p6", kill("k"), 1, map).outcome).toBe("protected");
+    const poisoned = rules.addReminder(night(), "p2", { id: "e", sourceCharacterId: "poisoner", label: "Envenenado" });
+    expect(rules.demonKill(poisoned, "p2", kill("k"), 1, map).game.players[2].alive).toBe(false);
+  });
+
+  it("si el Diablillo se elige a sí mismo, muere y se ofrece el pase al Esbirro", () => {
+    const { game: g, outcome } = rules.demonKill(night(), "p0", kill("k"), 1, map);
+    expect(outcome).toBe("selfKill");
+    expect(rules.demonSuccession(g, map)?.heirs.map((h) => h.characterId)).toEqual(["baron"]);
+  });
+
+  it("solo los «Muerto» de un Demonio son ataques", () => {
+    expect(rules.isDemonKill({ sourceCharacterId: "imp", label: "Muerto" }, map)).toBe(true);
+    expect(rules.isDemonKill({ sourceCharacterId: "gambler", label: "Muerto" }, map)).toBe(false);
+    expect(rules.isDemonKill({ sourceCharacterId: "poisoner", label: "Envenenado" }, map)).toBe(false);
+  });
+});

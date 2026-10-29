@@ -5,6 +5,7 @@ import {
   allowedDistributions,
   baseDistribution,
   DECOYS,
+  isDealt,
   MAX_BAG_PLAYERS,
   SETUP_MODIFIERS,
   validateSelection,
@@ -45,7 +46,7 @@ export function randomSelection(playerCount: number, scriptCharacters: Character
       }
     }
 
-    if (bag.length === bagSize && !validateSelection(playerCount, bag).some((i) => i.level === "error")) {
+    if (bag.filter(isDealt).length === bagSize && !validateSelection(playerCount, bag).some((i) => i.level === "error")) {
       return bag;
     }
   }
@@ -141,5 +142,29 @@ export function applySetupEffects(
     );
     log.push(`${drunk.name} es el Tonto del pueblo borracho.`);
   }
+  // No Dashii: los Aldeanos más cercanos a cada lado están envenenados desde el principio.
+  for (const demon of result.filter((p) => p.characterId === "nodashii")) {
+    const poisoned = nearestTownsfolk(result, demon, characters);
+    const ids = new Set(poisoned.map((p) => p.id));
+    result = result.map((p) =>
+      ids.has(p.id) ? { ...p, reminders: [...p.reminders, { id: newId(), sourceCharacterId: "nodashii", label: "Envenenado" }] } : p,
+    );
+    if (poisoned.length) log.push(`${poisoned.map((p) => p.name).join(" y ")}: envenenados por el No Dashii (Aldeanos vecinos).`);
+  }
   return { players: result, log };
+}
+
+/** El Aldeano más cercano a cada lado de un jugador (saltando a los que no son Aldeanos). */
+export function nearestTownsfolk(players: Player[], from: Player, characters: Map<string, Character>): Player[] {
+  const seated = [...players].sort((a, b) => a.seat - b.seat);
+  const n = seated.length;
+  const at = seated.findIndex((p) => p.id === from.id);
+  const walk = (dir: 1 | -1) => {
+    for (let k = 1; k < n; k++) {
+      const p = seated[(at + dir * k + n) % n];
+      if (characters.get(p.characterId)?.team === "townsfolk") return p;
+    }
+    return undefined;
+  };
+  return [...new Set([walk(-1), walk(1)].filter((p): p is Player => !!p))];
 }
