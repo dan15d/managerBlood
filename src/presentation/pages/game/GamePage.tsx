@@ -1,3 +1,4 @@
+import { SaveQueue } from "@application/use-cases/SaveQueue";
 import type { Character } from "@domain/entities/Character";
 import type { Game } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
@@ -54,7 +55,6 @@ export function GamePage() {
   const [ending, setEnding] = useState(false);
   const [pitHagTarget, setPitHagTarget] = useState<string | null>(null);
   const characters = app.catalog.map();
-  const saving = useRef(Promise.resolve());
   const gameRef = useRef<Game | null>(null);
   // Estados anteriores para «Deshacer» (solo en esta pantalla; al recargar se pierden).
   const history = useRef<Game[]>([]);
@@ -79,14 +79,40 @@ export function GamePage() {
       });
   }, [app, id, navigate, toast]);
 
+  // Los guardados van en cola; si uno falla (sin cobertura…) se reintenta solo hasta que entre.
+  const saves = useMemo(
+    () =>
+      new SaveQueue<Game>((g) => app.saveGame.execute(g), {
+        onError: (e) => toast(`${errorMessage(e)} Se volverá a intentar solo.`, "error"),
+        onRecovered: () => toast("Guardado: los móviles ya están al día."),
+      }),
+    [app, toast],
+  );
+
   const persist = useCallback(
     (next: Game) => {
       gameRef.current = next;
       setGame(next);
-      saving.current = saving.current.then(() => app.saveGame.execute(next)).catch((e) => toast(errorMessage(e), "error"));
+      void saves.save(next);
     },
-    [app, toast],
+    [saves],
   );
+
+  // Reintento: al volver la conexión, al volver a la app y cada 10 segundos mientras falte guardar.
+  useEffect(() => {
+    const retry = () => {
+      if (saves.failed && navigator.onLine !== false) void saves.retry();
+    };
+    const onVisible = () => document.visibilityState === "visible" && retry();
+    window.addEventListener("online", retry);
+    document.addEventListener("visibilitychange", onVisible);
+    const timer = window.setInterval(retry, 10_000);
+    return () => {
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(timer);
+    };
+  }, [saves]);
 
   /** Aplica una regla del dominio y guarda (en cola, para no pisar guardados anteriores). */
   const change = useCallback(
