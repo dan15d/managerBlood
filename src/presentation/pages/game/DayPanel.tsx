@@ -1,5 +1,5 @@
 import type { Character } from "@domain/entities/Character";
-import type { Game } from "@domain/entities/Game";
+import type { Game, Nomination } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { useState } from "react";
 import { Confirm, Sheet } from "../../components/Sheet";
@@ -13,10 +13,12 @@ interface Props {
   onStartNomination: () => void;
   /** Ejecutar sin votación tocando al jugador en el Grimorio (Virgen, Juez, Visir…). */
   onStartExecution: () => void;
+  /** Exiliar a un Viajero tocándolo en el Grimorio. */
+  onStartExile: () => void;
 }
 
 /** Nominaciones, votos y ejecución. El orden de voto empieza a la izquierda del nominado. */
-export function DayPanel({ game, characters, onChange, onStartNomination, onStartExecution }: Props) {
+export function DayPanel({ game, characters, onChange, onStartNomination, onStartExecution, onStartExile }: Props) {
   const [confirmDusk, setConfirmDusk] = useState(false);
   /** Recordatorios marcados para quitar al anochecer (null: la hoja está cerrada). */
   const [cleaning, setCleaning] = useState<string[] | null>(null);
@@ -54,32 +56,33 @@ export function DayPanel({ game, characters, onChange, onStartNomination, onStar
     else checkDuskVictory();
   };
 
+  // Tras la ejecución, el Carnicero aún puede nominar; los Viajeros vivos se pueden exiliar.
+  const butcherTurn = rules.butcherCanNominate(game);
+  const travellers = game.players.filter((p) => p.alive && characters.get(p.characterId)?.team === "traveller");
+  const needed = (n: Nomination) => (n.exile ? rules.exileThreshold(game) : threshold);
+
   return (
     <div className="stack">
-      {game.executedToday ? (
-        <div className="alert alert--info">
-          <strong>{name(game.executedToday)}</strong> ha sido ejecutado hoy. Ya no hay más nominaciones.
-        </div>
-      ) : open ? (
+      {open ? (
         <div className="night-card" style={{ borderColor: "var(--gold)" }}>
-          <div className="small muted">
-            {name(open.nominatorId)} nomina a
-          </div>
+          <div className="small muted">{open.exile ? "Exilio del Viajero" : `${name(open.nominatorId)} nomina a`}</div>
           <h2>{name(open.nomineeId)}</h2>
           <p className="small muted" style={{ marginTop: -4 }}>
-            Deja que se defienda. Después cuenta en el sentido del reloj, empezando por quien está a su izquierda.
+            {open.exile
+              ? "Votan todos, vivos y muertos, sin gastar su voto. Hace falta la mitad de todos los jugadores."
+              : "Deja que se defienda. Después cuenta en el sentido del reloj, empezando por quien está a su izquierda."}
           </p>
           <div className="vote-list">
             {voteOrder(open.nomineeId).map((p) => {
               const on = open.voterIds.includes(p.id);
-              // Burócrata (×3) y Ladrón (−1): su voto no vale 1.
+              // Burócrata (×3), Ladrón (−1) y Banshee (×2): su voto no vale 1.
               const weight = rules.voteWeight(p);
               return (
                 <button
                   key={p.id}
                   className="vote-btn"
                   aria-pressed={on}
-                  disabled={!on && !rules.canVote(p)}
+                  disabled={!on && !rules.canVote(p, game, open)}
                   onClick={() => onChange((g) => rules.toggleVote(g, open.id, p.id))}
                 >
                   <span className="hand" aria-hidden>
@@ -93,10 +96,10 @@ export function DayPanel({ game, characters, onChange, onStartNomination, onStar
           </div>
           <div className="row" style={{ margin: "12px 0 6px" }}>
             <span className="big-number">{votes}</span>
-            <span className="muted">/ {threshold} necesarios</span>
+            <span className="muted">/ {needed(open)} necesarios</span>
           </div>
           <div className="meter">
-            <div style={{ width: `${Math.max(0, Math.min(100, (votes / Math.max(threshold, 1)) * 100))}%` }} />
+            <div style={{ width: `${Math.max(0, Math.min(100, (votes / Math.max(needed(open), 1)) * 100))}%` }} />
           </div>
           <button className="btn btn--primary btn--block" style={{ marginTop: 12 }} onClick={() => onChange((g) => rules.closeNomination(g, open.id))}>
             Cerrar votación
@@ -104,15 +107,34 @@ export function DayPanel({ game, characters, onChange, onStartNomination, onStar
         </div>
       ) : (
         <div className="stack" style={{ gap: 8 }}>
-          <button className="btn btn--primary btn--big" onClick={onStartNomination}>
-            <Gavel /> Nueva nominación
-          </button>
-          <p className="muted small" style={{ margin: 0, textAlign: "center" }}>
-            Después toca en el Grimorio a quien nomina y a quien es nominado.
-          </p>
-          <button className="btn btn--small btn--ghost" style={{ alignSelf: "center" }} onClick={onStartExecution}>
-            Ejecutar sin votación…
-          </button>
+          {game.executedToday && (
+            <div className="alert alert--info">
+              <strong>{name(game.executedToday)}</strong> ha sido ejecutado hoy.{" "}
+              {butcherTurn ? "El Carnicero puede nominar a otro jugador." : "Ya no hay más nominaciones."}
+            </div>
+          )}
+          {(!game.executedToday || butcherTurn) && (
+            <>
+              <button className="btn btn--primary btn--big" onClick={onStartNomination}>
+                <Gavel /> {butcherTurn ? "Nominación del Carnicero" : "Nueva nominación"}
+              </button>
+              <p className="muted small" style={{ margin: 0, textAlign: "center" }}>
+                Después toca en el Grimorio a quien nomina y a quien es nominado.
+              </p>
+            </>
+          )}
+          <div className="row" style={{ justifyContent: "center", gap: 6 }}>
+            {!game.executedToday && (
+              <button className="btn btn--small btn--ghost" onClick={onStartExecution}>
+                Ejecutar sin votación…
+              </button>
+            )}
+            {travellers.length > 0 && (
+              <button className="btn btn--small btn--ghost" onClick={onStartExile}>
+                Exiliar a un Viajero…
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -125,22 +147,22 @@ export function DayPanel({ game, characters, onChange, onStartNomination, onStar
               .map((n) => (
                 <li key={n.id} className="row">
                   <span style={{ flex: 1 }}>
-                    {name(n.nomineeId)} <span className="muted small">(por {name(n.nominatorId)})</span>
+                    {name(n.nomineeId)} <span className="muted small">{n.exile ? "(exilio)" : `(por ${name(n.nominatorId)})`}</span>
                   </span>
-                  <strong className={rules.voteCount(game, n) >= threshold ? "team-fabled" : "muted"}>{rules.voteCount(game, n)} votos</strong>
+                  <strong className={rules.voteCount(game, n) >= needed(n) ? "team-fabled" : "muted"}>{rules.voteCount(game, n)} votos</strong>
                 </li>
               ))}
           </ul>
         </div>
       )}
 
-      {!game.executedToday && (
+      {(!game.executedToday || game.butcherNominationId) && (
         <div className="alert alert--info small">
           {block ? (
             <>
               En la picota: <strong>{name(block.playerId)}</strong> con {block.votes} votos.
             </>
-          ) : game.nominations.some((n) => n.closed) ? (
+          ) : game.nominations.some((n) => n.closed && !n.exile) ? (
             "Nadie está en la picota (sin votos suficientes o empate)."
           ) : (
             `Se necesitan ${threshold} votos para ejecutar. Pide nominaciones cuando hayan hablado unos minutos.`
@@ -149,8 +171,8 @@ export function DayPanel({ game, characters, onChange, onStartNomination, onStar
       )}
 
       <div className="action-bar">
-        {block && !game.executedToday && !open && (
-          <button className="btn btn--primary" onClick={() => onChange((g) => rules.execute(g, block.playerId))}>
+        {block && !open && (
+          <button className="btn btn--primary" onClick={() => onChange((g) => rules.execute(g, block.playerId, characters))}>
             Ejecutar a {name(block.playerId)}
           </button>
         )}

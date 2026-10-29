@@ -3,6 +3,8 @@ import type { Game, Nomination, Phase, Player, ReminderToken } from "../entities
 import { RuleViolation } from "../errors";
 import {
   demonPlayers,
+  has,
+  healthy,
   LEVIATHAN_GOOD_EXECUTED,
   LILMONSTA_BABYSITTER,
   lleechHost,
@@ -237,6 +239,7 @@ export function startDay(game: Game): Game {
     executedToday: undefined,
     nightDeaths: [],
     dayDeaths: [],
+    butcherNominationId: undefined,
   };
   return touch(next, died.length ? `Amanece. Han muerto esta noche: ${died.join(", ")}.` : "Amanece. Nadie ha muerto esta noche.");
 }
@@ -264,17 +267,34 @@ export function toggleFabled(game: Game, character: Character): Game {
 
 // ---------- Nominaciones y votos ----------
 
-/** Votos necesarios: la mitad de los vivos, redondeando hacia arriba. */
-export const voteThreshold = (game: Game) => Math.ceil(alivePlayers(game).length / 2);
+/** La Banshee que ha muerto por el Demonio: nomina dos veces al día y vota dos veces, aunque esté muerta. */
+const isBanshee = (p: Player) => p.characterId === "banshee" && has(p, "banshee", "Tiene habilidad");
+/** Con el Voudon vivo solo votan él y los muertos (sin gastar su voto) y basta un voto. */
+const voudonActive = (game: Game) => game.players.some((p) => p.characterId === "voudon" && p.alive && healthy(p));
+/** Nominaciones para ejecutar (los exilios de Viajeros van aparte). */
+const executionNominations = (game: Game) => game.nominations.filter((n) => !n.exile);
+
+/** Votos necesarios: la mitad de los vivos, redondeando hacia arriba (con el Voudon, basta 1). */
+export const voteThreshold = (game: Game) => (voudonActive(game) ? 1 : Math.ceil(alivePlayers(game).length / 2));
+
+/** Para exiliar a un Viajero hace falta la mitad de todos los jugadores, vivos o muertos. */
+export const exileThreshold = (game: Game) => Math.ceil(game.players.length / 2);
+
+/** El Carnicero vivo y sano puede nominar una vez más después de la ejecución de hoy. */
+export const butcherCanNominate = (game: Game) =>
+  !!game.executedToday && !game.butcherNominationId && game.players.some((p) => p.characterId === "butcher" && p.alive && healthy(p));
 
 export function canNominate(game: Game, nominatorId: string, nomineeId: string): string | null {
   if (game.phase.kind !== "day") return "Solo se nomina de día.";
-  if (game.executedToday) return "Ya ha habido una ejecución hoy.";
   if (game.nominations.some((n) => !n.closed)) return "Primero hay que cerrar la votación en curso.";
   const nominator = findPlayer(game, nominatorId);
-  if (!nominator?.alive) return "Solo los jugadores vivos pueden nominar.";
-  if (game.nominations.some((n) => n.nominatorId === nominatorId)) return `${nominator.name} ya ha nominado hoy.`;
-  if (game.nominations.some((n) => n.nomineeId === nomineeId)) return "Ese jugador ya ha sido nominado hoy.";
+  if (!nominator) return "Ese jugador no está en la partida.";
+  const butcherAgain = !!game.executedToday && nominator.characterId === "butcher" && butcherCanNominate(game);
+  if (game.executedToday && !butcherAgain) return "Ya ha habido una ejecución hoy.";
+  if (!nominator.alive && !isBanshee(nominator)) return "Solo los jugadores vivos pueden nominar.";
+  const made = executionNominations(game).filter((n) => n.nominatorId === nominatorId).length;
+  if (!butcherAgain && made >= (isBanshee(nominator) ? 2 : 1)) return `${nominator.name} ya ha nominado hoy.`;
+  if (nomineeId && executionNominations(game).some((n) => n.nomineeId === nomineeId)) return "Ese jugador ya ha sido nominado hoy.";
   return null;
 }
 
@@ -283,26 +303,52 @@ export function nominate(game: Game, nominatorId: string, nomineeId: string, id:
   if (problem) throw new RuleViolation(problem);
   const nomination: Nomination = { id, nominatorId, nomineeId, voterIds: [], closed: false };
   const names = [findPlayer(game, nominatorId)!.name, findPlayer(game, nomineeId)!.name];
-  return touch({ ...game, nominations: [...game.nominations, nomination] }, `${names[0]} nomina a ${names[1]}.`);
+  // Tras la ejecución, solo el Carnicero puede nominar: se recuerda cuál es su nominación.
+  const butcher = game.executedToday ? { butcherNominationId: id } : {};
+  return touch({ ...game, ...butcher, nominations: [...game.nominations, nomination] }, `${names[0]} nomina a ${names[1]}.`);
 }
 
-/** Un muerto solo puede votar si le queda su voto fantasma. */
-export function canVote(player: Player) {
+/** Exiliar a un Viajero vivo: cualquiera puede pedirlo, una vez por Viajero y día. */
+export function canExile(game: Game, travellerId: string, characters: Map<string, Character>): string | null {
+  if (game.phase.kind !== "day") return "Solo se exilia de día.";
+  if (game.nominations.some((n) => !n.closed)) return "Primero hay que cerrar la votación en curso.";
+  const traveller = findPlayer(game, travellerId);
+  if (!traveller || characters.get(traveller.characterId)?.team !== "traveller") return "Solo se puede exiliar a los Viajeros.";
+  if (!traveller.alive) return `${traveller.name} ya está muerto.`;
+  if (game.nominations.some((n) => n.exile && n.nomineeId === travellerId)) return `Hoy ya se ha pedido el exilio de ${traveller.name}.`;
+  return null;
+}
+
+export function callExile(game: Game, travellerId: string, id: string, characters: Map<string, Character>): Game {
+  const problem = canExile(game, travellerId, characters);
+  if (problem) throw new RuleViolation(problem);
+  const nomination: Nomination = { id, nominatorId: "", nomineeId: travellerId, voterIds: [], closed: false, exile: true };
+  return touch({ ...game, nominations: [...game.nominations, nomination] }, `Se pide el exilio de ${findPlayer(game, travellerId)!.name}.`);
+}
+
+/**
+ * Si un jugador puede votar: los vivos, y los muertos con su voto fantasma. En un exilio vota
+ * todo el mundo; con el Voudon, solo él y los muertos; la Banshee con habilidad, siempre.
+ */
+export function canVote(player: Player, game?: Game, nomination?: Nomination) {
+  if (nomination?.exile) return true;
+  if (game && voudonActive(game)) return player.characterId === "voudon" || !player.alive;
+  if (isBanshee(player)) return true;
   return player.alive || !player.ghostVoteUsed;
 }
 
 /**
- * Cuánto vale el voto de un jugador hoy: el elegido anoche por el Burócrata vota ×3 y el
- * elegido por el Ladrón vota en negativo.
+ * Cuánto vale el voto de un jugador hoy: el elegido anoche por el Burócrata vota ×3, el
+ * elegido por el Ladrón vota en negativo y la Banshee con habilidad vota dos veces.
  */
 export function voteWeight(player: Player): number {
-  const has = (source: string, label: string) => player.reminders.some((r) => r.sourceCharacterId === source && r.label === label);
-  if (has("thief", "Voto negativo")) return -1;
-  if (has("bureaucrat", "3 votos")) return 3;
+  if (has(player, "thief", "Voto negativo")) return -1;
+  if (has(player, "bureaucrat", "3 votos")) return 3;
+  if (isBanshee(player)) return 2;
   return 1;
 }
 
-/** Votos de una nominación, con el peso de cada voto (Burócrata, Ladrón). */
+/** Votos de una nominación, con el peso de cada voto (Burócrata, Ladrón, Banshee). */
 export const voteCount = (game: Game, nomination: Nomination) =>
   nomination.voterIds.reduce((sum, id) => sum + (findPlayer(game, id) ? voteWeight(findPlayer(game, id)!) : 1), 0);
 
@@ -312,62 +358,111 @@ export function toggleVote(game: Game, nominationId: string, voterId: string): G
   const voter = findPlayer(game, voterId);
   if (!voter) throw new RuleViolation("Ese jugador no está en la partida.");
   const voting = nomination.voterIds.includes(voterId);
-  if (!voting && !canVote(voter)) throw new RuleViolation(`${voter.name} está muerto y ya gastó su voto.`);
+  if (!voting && !canVote(voter, game, nomination)) {
+    throw new RuleViolation(voudonActive(game) && voter.alive ? `Con el Voudon, ${voter.name} no puede votar.` : `${voter.name} está muerto y ya gastó su voto.`);
+  }
   const voterIds = voting ? nomination.voterIds.filter((v) => v !== voterId) : [...nomination.voterIds, voterId];
   return { ...game, nominations: game.nominations.map((n) => (n.id === nominationId ? { ...n, voterIds } : n)) };
 }
 
-/** Cierra la votación: los muertos que han votado gastan su voto. */
+/**
+ * Cierra la votación: los muertos que han votado gastan su voto (salvo en un exilio, con el
+ * Voudon o la Banshee). Un exilio con votos suficientes mata al Viajero en el acto.
+ */
 export function closeNomination(game: Game, nominationId: string): Game {
   const nomination = game.nominations.find((n) => n.id === nominationId);
   if (!nomination || nomination.closed) return game;
+  const freeVotes = nomination.exile || voudonActive(game);
   const players = game.players.map((p) =>
-    !p.alive && nomination.voterIds.includes(p.id) ? { ...p, ghostVoteUsed: true } : p,
+    !p.alive && !freeVotes && !isBanshee(p) && nomination.voterIds.includes(p.id) ? { ...p, ghostVoteUsed: true } : p,
   );
   const nominee = findPlayer(game, nomination.nomineeId)!;
-  return touch(
+  const votes = voteCount(game, nomination);
+  let next = touch(
     {
       ...game,
       players,
       nominations: game.nominations.map((n) => (n.id === nominationId ? { ...n, closed: true } : n)),
     },
-    `${nominee.name} recibe ${voteCount(game, nomination)} votos.`,
+    `${nominee.name} recibe ${votes} votos${nomination.exile ? " para el exilio" : ""}.`,
   );
+  if (nomination.exile) {
+    next = votes >= exileThreshold(game) ? killPlayer(next, nominee.id, "es exiliado") : touch(next, `${nominee.name} no es exiliado.`);
+  }
+  return next;
 }
 
 /**
- * Quién está «a punto de morir»: el nominado con más votos si llega al umbral.
- * Si empata con otro, no se ejecuta a nadie.
+ * Quién está «a punto de morir»: el nominado con más votos si llega al umbral. Si empata con
+ * otro, no se ejecuta a nadie (con el Voudon, sigue el primero hasta que otro le supere).
+ * Tras la ejecución, solo cuenta la nominación del Carnicero.
  */
 export function onTheBlock(game: Game): { playerId: string; votes: number } | null {
-  const closed = game.nominations.filter((n) => n.closed);
   const threshold = voteThreshold(game);
+  if (game.executedToday) {
+    // Ya hubo ejecución: solo queda la nominación del Carnicero (si la hay y aún no se ha ejecutado).
+    const n = game.nominations.find((x) => x.id === game.butcherNominationId && x.closed);
+    const votes = n ? voteCount(game, n) : 0;
+    return n && votes >= threshold && game.executedToday !== n.nomineeId ? { playerId: n.nomineeId, votes } : null;
+  }
+  const keepFirst = voudonActive(game);
   let best: { playerId: string; votes: number } | null = null;
   let tied = false;
-  for (const n of closed) {
+  for (const n of executionNominations(game).filter((x) => x.closed)) {
     const votes = voteCount(game, n);
     if (votes < threshold) continue;
     if (!best || votes > best.votes) {
       best = { playerId: n.nomineeId, votes };
       tied = false;
-    } else if (votes === best.votes) {
+    } else if (votes === best.votes && !keepFirst) {
       tied = true;
     }
   }
   return tied ? null : best;
 }
 
-export function execute(game: Game, playerId: string): Game {
+/** Quien sobrevive a ser ejecutado: el elegido por el Abogado del diablo, el Marinero sano y el Bufón (una vez). */
+function survivesExecution(player: Player): string | null {
+  if (has(player, "devilsadvocate", "Sobrevive ejecución")) return "el Abogado del diablo le protege";
+  if (player.characterId === "sailor" && healthy(player)) return "el Marinero no puede morir";
+  if (player.characterId === "fool" && healthy(player)) return "el Bufón no muere la primera vez";
+  return null;
+}
+
+/**
+ * Ejecución. El Abogado del diablo, el Marinero y el Bufón sobreviven (pero cuenta como
+ * ejecución). Con `characters`, si se ejecuta al Demonio y la Mente maestra está viva, se
+ * juega un día más.
+ */
+export function execute(game: Game, playerId: string, characters?: Map<string, Character>): Game {
   if (game.phase.kind !== "day") throw new RuleViolation("Solo se ejecuta de día.");
-  if (game.executedToday) throw new RuleViolation("Solo hay una ejecución al día.");
+  const butcherNomination = game.nominations.find((n) => n.id === game.butcherNominationId);
+  const butcherExecution = !!game.executedToday && butcherNomination?.nomineeId === playerId && game.executedToday !== playerId;
+  if (game.executedToday && !butcherExecution) throw new RuleViolation("Solo hay una ejecución al día.");
   const player = findPlayer(game, playerId);
   if (!player) throw new RuleViolation("Ese jugador no está en la partida.");
-  // El Zombuul que solo parecía muerto sí muere al ser ejecutado.
-  let after =
-    player.alive || zombuulSeemsDead(player) ? killPlayer(game, playerId, "es ejecutado") : touch(game, `${player.name} es ejecutado (ya estaba muerto).`);
+
+  const survives = player.alive ? survivesExecution(player) : null;
+  let after: Game;
+  if (survives) {
+    after = touch(game, `${player.name} es ejecutado, pero sigue vivo (${survives}).`);
+    if (player.characterId === "fool") after = withReminder(after, playerId, "fool", "Sin habilidad");
+  } else {
+    // El Zombuul que solo parecía muerto sí muere al ser ejecutado.
+    after =
+      player.alive || zombuulSeemsDead(player) ? killPlayer(game, playerId, "es ejecutado") : touch(game, `${player.name} es ejecutado (ya estaba muerto).`);
+  }
   // El Leviatán cuenta los buenos ejecutados: con el segundo, gana el Mal.
   const leviathan = after.players.some((p) => p.characterId === "leviathan" && reallyAlive(p));
   if (leviathan && player.alignment === "good") after = withReminder(after, playerId, "leviathan", LEVIATHAN_GOOD_EXECUTED);
+  // Mente maestra: el Demonio ejecutado no acaba la partida; se juega un día más.
+  if (characters && !game.mastermindDay) {
+    const mastermind = after.players.find((p) => p.characterId === "mastermind" && p.alive && healthy(p));
+    const demons = demonPlayers(after, characters);
+    if (mastermind && demons.some((d) => d.id === playerId) && !demons.some(reallyAlive) && !demonSuccession(after, characters)) {
+      after = touch({ ...after, mastermindDay: game.phase.number + 1 }, "La Mente maestra sigue viva: se juega un día más (no anuncies que ha muerto el Demonio).");
+    }
+  }
   return { ...after, executedToday: playerId };
 }
 
@@ -375,10 +470,10 @@ export function execute(game: Game, playerId: string): Game {
  * Ejecución que no sale de una votación (la Virgen, el Juez, el Visir, la locura del
  * Cerenovus…). Si había una votación abierta, se cierra.
  */
-export function executeNow(game: Game, playerId: string, reason?: string): Game {
+export function executeNow(game: Game, playerId: string, reason?: string, characters?: Map<string, Character>): Game {
   const open = game.nominations.find((n) => !n.closed);
   const closed = open ? { ...game, nominations: game.nominations.map((n) => (n.id === open.id ? { ...n, closed: true } : n)) } : game;
-  return execute(reason ? touch(closed, reason) : closed, playerId);
+  return execute(reason ? touch(closed, reason) : closed, playerId, characters);
 }
 
 const VIRGIN_USED = "Sin habilidad";
@@ -480,12 +575,15 @@ const PROTECTION = /^(a salvo|protegido|no puede morir)$/i;
 export const isDemonKill = (reminder: Pick<ReminderToken, "sourceCharacterId" | "label">, characters: Map<string, Character>) =>
   reminder.label === "Muerto" && characters.get(reminder.sourceCharacterId)?.team === "demon";
 
-export type DemonKillOutcome = "killed" | "protected" | "selfKill" | "mayor" | "jump";
+export type DemonKillOutcome = "killed" | "protected" | "selfKill" | "mayor" | "jump" | "fool" | "banshee";
 
-const isProtected = (target: Player) => {
-  const healthy = !target.reminders.some((r) => DISABLED_REMINDER.test(r.label));
-  return (target.characterId === "soldier" && healthy) || target.reminders.some((r) => PROTECTION.test(r.label));
-};
+/** No muere por el Demonio: Soldado o Marinero sanos, o con «A salvo», «Protegido», «No puede morir». */
+const isProtected = (target: Player) =>
+  ((target.characterId === "soldier" || target.characterId === "sailor") && healthy(target)) ||
+  target.reminders.some((r) => PROTECTION.test(r.label));
+
+/** El Bufón sano que aún no ha usado su habilidad sobrevive a su primera muerte. */
+const foolSurvives = (p: Player) => p.characterId === "fool" && healthy(p);
 
 /**
  * El Demonio ataca: el jugador muere en ese momento (se anuncia al amanecer), salvo que esté
@@ -518,9 +616,21 @@ export function demonKill(
     }
   }
 
+  if (foolSurvives(target)) {
+    return { game: withReminder(game, targetId, "fool", "Sin habilidad"), outcome: "fool" };
+  }
+
   const self = target.characterId === reminder.sourceCharacterId;
-  const next = killPlayer(placeReminder(game, targetId, reminder, copies), targetId, self ? `se mata a sí mismo (${demon})` : `muere por ${demon}`);
-  return { game: next, outcome: self ? "selfKill" : target.characterId === "mayor" ? "mayor" : "killed" };
+  let next = killPlayer(placeReminder(game, targetId, reminder, copies), targetId, self ? `se mata a sí mismo (${demon})` : `muere por ${demon}`);
+  // Banshee sana muerta por el Demonio: todos lo saben y gana su habilidad.
+  if (target.characterId === "banshee" && healthy(target)) next = withReminder(next, targetId, "banshee", "Tiene habilidad");
+  // Si el Demonio mata al nieto, la Abuela muere también.
+  if (has(target, "grandmother", "Nieto")) {
+    for (const grandmother of next.players.filter((p) => p.characterId === "grandmother" && p.alive && healthy(p))) {
+      next = killPlayer(next, grandmother.id, "muere con su nieto");
+    }
+  }
+  return { game: next, outcome: self ? "selfKill" : target.characterId === "mayor" ? "mayor" : target.characterId === "banshee" && healthy(target) ? "banshee" : "killed" };
 }
 
 /**
@@ -590,6 +700,8 @@ export function applyReminderChoice(
       selfKill: `${target.name} se ha elegido a sí mismo y muere: elige arriba quién es el nuevo Demonio.`,
       mayor: `${target.name} es el Alcalde: puede morir otro en su lugar. Si lo decides, deshaz y elige a ese jugador.`,
       jump: `${demon} salta: ${target.name} es el nuevo ${demon} (malo) y el anterior muere. Despiértalo y enséñale TÚ ERES, ${demon} y el pulgar hacia abajo.`,
+      fool: `${target.name} es el Bufón: esta vez no muere y pierde su habilidad.`,
+      banshee: `${target.name} es la Banshee: muere y lo sabe toda la mesa. Desde ahora nomina y vota dos veces.`,
       killed: next.players.find((p) => p.id === targetId)?.alive
         ? `${target.name} no muere esta vez.`
         : `${target.name} muere esta noche. Se anunciará al amanecer.`,
@@ -618,21 +730,57 @@ export function succeedDemon(game: Game, succession: DemonSuccession, heirId: st
   return setCharacter(game, heirId, demon);
 }
 
+/** El Hereje (vivo o muerto, sano) invierte quién gana. */
+function withHeretic(game: Game, hint: VictoryHint | null): VictoryHint | null {
+  if (!hint || !game.players.some((p) => p.characterId === "heretic" && healthy(p))) return hint;
+  const winner: Alignment = hint.winner === "good" ? "evil" : "good";
+  return { winner, reason: `${hint.reason} Con el Hereje en juego se invierte: gana ${winner === "good" ? "el Bien" : "el Mal"}.` };
+}
+
+/** El gemelo bueno de la Gemela malvada (lleva su recordatorio «Gemelo»). */
+const goodTwin = (game: Game) => game.players.find((p) => has(p, "eviltwin", "Gemelo"));
+const evilTwinAlive = (game: Game) => game.players.some((p) => p.characterId === "eviltwin" && reallyAlive(p) && healthy(p));
+
 /**
  * Sugerencia de final según las reglas básicas. El Narrador decide: hay personajes
- * (Alcalde, Santo…) que cambian quién gana. Si hay un heredero del Demonio, la partida sigue.
+ * (Patoso, Goblin…) que cambian quién gana. Si hay un heredero del Demonio, la partida sigue.
  * El Zombuul que solo parece muerto sigue vivo; quien cuida a Lil' Monsta es el Demonio.
+ * La Gemela malvada y la Mente maestra pueden impedir o retrasar la victoria del Bien; el
+ * Hereje invierte el resultado.
  */
 export function victoryHint(game: Game, characters: Map<string, Character>): VictoryHint | null {
   if (game.status === "finished") return null;
-  // El Santo ejecutado hoy (y sano): su equipo pierde.
+  return withHeretic(game, baseVictory(game, characters));
+}
+
+function baseVictory(game: Game, characters: Map<string, Character>): VictoryHint | null {
   const executed = game.executedToday ? findPlayer(game, game.executedToday) : undefined;
-  if (executed?.characterId === "saint" && !executed.alive && !executed.reminders.some((r) => DISABLED_REMINDER.test(r.label))) {
+
+  // Día extra de la Mente maestra: si se ejecuta a alguien, pierde su equipo.
+  if (game.mastermindDay) {
+    if (game.phase.kind === "day" && game.phase.number === game.mastermindDay && executed) {
+      return executed.alignment === "good"
+        ? { winner: "evil", reason: "Día de la Mente maestra: se ha ejecutado a un jugador bueno." }
+        : { winner: "good", reason: "Día de la Mente maestra: se ha ejecutado a un jugador malo." };
+    }
+    return null;
+  }
+
+  // El Santo ejecutado hoy (y sano): su equipo pierde.
+  if (executed?.characterId === "saint" && !executed.alive && healthy(executed)) {
     return { winner: executed.alignment === "good" ? "evil" : "good", reason: "Han ejecutado al Santo." };
   }
+  // Gemela malvada: si se ejecuta a su gemelo bueno, gana el Mal.
+  const twin = goodTwin(game);
+  if (executed && twin?.id === executed.id && executed.alignment === "good" && evilTwinAlive(game)) {
+    return { winner: "evil", reason: "Han ejecutado al gemelo bueno de la Gemela malvada." };
+  }
+
   const demons = demonPlayers(game, characters);
   if (demons.length && !demons.some(reallyAlive)) {
     if (demonSuccession(game, characters)) return null;
+    // Mientras vivan las dos gemelas, los buenos no pueden ganar.
+    if (twin && reallyAlive(twin) && evilTwinAlive(game)) return null;
     return { winner: "good", reason: "El Demonio ha muerto." };
   }
   const leviathan = game.players.some((p) => p.characterId === "leviathan" && reallyAlive(p));
@@ -644,16 +792,41 @@ export function victoryHint(game: Game, characters: Map<string, Character>): Vic
 }
 
 /**
+ * Por qué la partida sigue aunque haya muerto el Demonio (para avisar al Narrador): el día extra
+ * de la Mente maestra o la Gemela malvada con su gemelo vivos.
+ */
+export function victoryNote(game: Game, characters: Map<string, Character>): string | null {
+  if (game.status === "finished") return null;
+  if (game.mastermindDay && !(game.phase.kind === "day" && game.phase.number === game.mastermindDay && game.executedToday)) {
+    return `Ha muerto el Demonio, pero la Mente maestra sigue viva: el día ${game.mastermindDay} se juega igual. Si ese día se ejecuta a un bueno, gana el Mal; si se ejecuta a un malo o no hay ejecución, gana el Bien.`;
+  }
+  const demons = demonPlayers(game, characters);
+  const twin = goodTwin(game);
+  if (demons.length && !demons.some(reallyAlive) && !demonSuccession(game, characters) && twin && reallyAlive(twin) && evilTwinAlive(game)) {
+    return "Ha muerto el Demonio, pero los buenos no pueden ganar mientras vivan la Gemela malvada y su gemelo.";
+  }
+  return null;
+}
+
+/**
  * Victorias que se deciden al terminar el día:
+ * - Día extra de la Mente maestra sin ejecución: gana el Bien.
  * - Vortox vivo y nadie ejecutado hoy: gana el Mal.
  * - Alcalde vivo y sano, 3 jugadores vivos y nadie ejecutado hoy: gana su equipo.
  * - Leviatán vivo al terminar el día 5 (o más): gana el Mal.
  */
 export function duskVictory(game: Game, characters: Map<string, Character>): VictoryHint | null {
   if (game.status === "finished" || game.phase.kind !== "day") return null;
+  return withHeretic(game, baseDuskVictory(game, characters));
+}
+
+function baseDuskVictory(game: Game, characters: Map<string, Character>): VictoryHint | null {
+  if (game.mastermindDay === game.phase.number && !game.executedToday) {
+    return { winner: "good", reason: "Termina el día de la Mente maestra sin ejecución." };
+  }
   const alive = (id: string) => game.players.some((p) => p.characterId === id && reallyAlive(p));
   if (alive("vortox") && !game.executedToday) return { winner: "evil", reason: "Con Vortox vivo, un día sin ejecución hace ganar al Mal." };
-  const mayor = game.players.find((p) => p.characterId === "mayor" && p.alive && !p.reminders.some((r) => DISABLED_REMINDER.test(r.label)));
+  const mayor = game.players.find((p) => p.characterId === "mayor" && p.alive && healthy(p));
   const aliveCount = game.players.filter((p) => reallyAlive(p) && characters.get(p.characterId)?.team !== "traveller").length;
   if (mayor && aliveCount === 3 && !game.executedToday) {
     return { winner: mayor.alignment, reason: "Quedan 3 jugadores vivos, no ha habido ejecución y el Alcalde sigue vivo." };

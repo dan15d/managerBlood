@@ -13,7 +13,10 @@ export const LILMONSTA_BABYSITTER = "Es el Demonio";
 /** El Leviatán ha visto ejecutar a este jugador bueno. */
 export const LEVIATHAN_GOOD_EXECUTED = "Bueno ejecutado";
 
-const has = (p: Player, source: string, label: string) => p.reminders.some((r) => r.sourceCharacterId === source && r.label === label);
+export const has = (p: Player, source: string, label: string) => p.reminders.some((r) => r.sourceCharacterId === source && r.label === label);
+
+/** Sin recordatorios que le quiten la habilidad (envenenado, borracho, sin habilidad). */
+export const healthy = (p: Player) => !p.reminders.some((r) => /envenen|borrach|sin habilidad/i.test(r.label));
 
 /** Zombuul que parece muerto pero sigue vivo (para las reglas cuenta como vivo). */
 export const zombuulSeemsDead = (p: Player) =>

@@ -32,7 +32,9 @@ type Pick =
   /** Cambiar sitios: se toca a uno y luego a otro, y se intercambian. Sigue activo hasta «Listo». */
   | { kind: "seat"; fromId?: string }
   /** Ejecutar sin votación (Virgen, Juez, Visir, locura…). */
-  | { kind: "execute" };
+  | { kind: "execute" }
+  /** Pedir el exilio de un Viajero. */
+  | { kind: "exile" };
 
 export function GamePage() {
   const { id } = useParams();
@@ -132,6 +134,9 @@ export function GamePage() {
   const hintKey = hint ? `${hint.winner}:${game.players.map((p) => +p.alive).join("")}` : "";
   const succession = rules.demonSuccession(game, characters);
   const successionKey = succession ? `succ:${game.phase.kind}:${game.players.map((p) => +p.alive).join("")}` : "";
+  // Por qué la partida sigue aunque haya muerto el Demonio (Mente maestra, Gemela malvada).
+  const note = rules.victoryNote(game, characters);
+  const heretic = game.players.some((p) => p.characterId === "heretic");
   const name = (pid: string) => game.players.find((p) => p.id === pid)?.name ?? "";
 
   const tapPlayer = (pid: string) => {
@@ -156,8 +161,15 @@ export function GamePage() {
       if (message) toast(message);
       return setPick(null);
     }
+    if (pick.kind === "exile") {
+      const problem = rules.canExile(game, pid, characters);
+      if (problem) return toast(problem, "error");
+      change((g) => rules.callExile(g, pid, app.newId(), characters));
+      setPick(null);
+      return setTab("phase");
+    }
     if (pick.kind === "execute") {
-      change((g) => rules.executeNow(g, pid));
+      change((g) => rules.executeNow(g, pid, undefined, characters));
       toast(`${name(pid)} es ejecutado.`);
       setPick(null);
       return setTab("phase");
@@ -176,7 +188,7 @@ export function GamePage() {
       const result = rules.virginNomination(rules.nominate(g, nominatorId, pid, app.newId()), nominatorId, pid, characters);
       virgin = result;
       return result.executes
-        ? rules.executeNow(result.game, nominatorId, `${name(nominatorId)} nomina a la Virgen siendo Aldeano: es ejecutado en el acto.`)
+        ? rules.executeNow(result.game, nominatorId, `${name(nominatorId)} nomina a la Virgen siendo Aldeano: es ejecutado en el acto.`, characters)
         : result.game;
     });
     if (virgin.executes) toast(`${name(pid)} es la Virgen y ${name(nominatorId)} es Aldeano: ${name(nominatorId)} es ejecutado en el acto.`);
@@ -193,6 +205,8 @@ export function GamePage() {
         : "Toca a un jugador y después a otro para cambiarlos de sitio"
       : pick.kind === "reminder"
       ? `Toca al jugador para poner «${pick.label}»`
+      : pick.kind === "exile"
+        ? "Toca al Viajero que se quiere exiliar"
       : pick.kind === "execute"
         ? "Toca al jugador que se ejecuta sin votación"
       : pick.kind === "nominator"
@@ -208,6 +222,8 @@ export function GamePage() {
           ? pick.fromId
             ? [pick.fromId]
             : game.players.map((p) => p.id)
+          : pick?.kind === "exile"
+            ? game.players.filter((p) => p.alive && characters.get(p.characterId)?.team === "traveller").map((p) => p.id)
           : pick?.kind === "execute"
             ? game.players.map((p) => p.id)
             : (step?.playerIds ?? []);
@@ -265,7 +281,8 @@ export function GamePage() {
       {ending && (
         <Sheet onClose={() => setEnding(false)} title="Terminar la partida" label="Terminar la partida">
           <p className="muted small" style={{ marginTop: 0 }}>
-            Para las victorias que la app no detecta sola: el Patoso, la Damisela, el Goblin, la Gemela malvada, el Hereje… Se puede
+            {heretic && <strong>Hay Hereje en juego: elige ya el ganador final (invertido). </strong>}
+            Para las victorias que la app no detecta sola: el Patoso, la Damisela, el Goblin… Se puede
             reabrir si te equivocas.
           </p>
           <div className="action-bar action-bar--sheet">
@@ -297,6 +314,10 @@ export function GamePage() {
           <button className="btn btn--small" onClick={() => change(rules.reopen)}>
             Reabrir
           </button>
+        </div>
+      ) : note ? (
+        <div className="alert alert--info" role="status">
+          {note}
         </div>
       ) : succession ? (
         dismissedHint !== successionKey && (
@@ -412,6 +433,10 @@ export function GamePage() {
                   onChange={change}
                   onStartNomination={() => {
                     setPick({ kind: "nominator" });
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  onStartExile={() => {
+                    setPick({ kind: "exile" });
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                   onStartExecution={() => {

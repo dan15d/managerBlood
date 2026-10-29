@@ -1,6 +1,6 @@
 import type { Character } from "../entities/Character";
 import type { Game, Player } from "../entities/Game";
-import { hasLilMonsta, reallyAlive } from "./Demons";
+import { hasLilMonsta, healthy, reallyAlive } from "./Demons";
 import { TOR, TOYMAKER } from "./SpecialRules";
 
 export type NightStepKind = "dusk" | "minion_info" | "demon_info" | "character" | "dawn";
@@ -75,12 +75,21 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
     },
   });
 
+  // Cultivador de opio: mientras viva sano, los malos no se conocen; la noche en que muere, sí.
+  const poppies = game.players.filter((p) => p.characterId === "poppygrower");
+  const poppyBlocks = poppies.some((p) => p.alive && healthy(p));
+  const poppyDied = poppies.some((p) => [...(game.nightDeaths ?? []), ...(game.dayDeaths ?? [])].includes(p.id));
+  const poppyOrder = characters.get("poppygrower")?.otherNight ?? 0;
+
   // Con Lil' Monsta no hay información de Esbirros ni de Demonio: se conocen en su paso.
-  if (first && hasEvilInfo(seated, game.fabledIds) && !hasLilMonsta(game)) {
+  const evilInfo = first ? hasEvilInfo(seated, game.fabledIds) && !hasLilMonsta(game) && !poppyBlocks : poppyDied && hasEvilInfo(seated, game.fabledIds);
+  if (evilInfo) {
     const minions = game.players.filter((p) => team(p) === "minion");
     const demons = game.players.filter((p) => team(p) === "demon");
+    // La noche en que muere el Cultivador de opio, justo después de su paso (sin faroles: ya los tuvo).
+    const later = !first;
     steps.push({
-      order: FIRST_NIGHT_MINION_INFO,
+      order: later ? poppyOrder + 0.1 : FIRST_NIGHT_MINION_INFO,
       step: {
         key: "minion_info",
         kind: "minion_info",
@@ -90,12 +99,14 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
       },
     });
     steps.push({
-      order: FIRST_NIGHT_DEMON_INFO,
+      order: later ? poppyOrder + 0.2 : FIRST_NIGHT_DEMON_INFO,
       step: {
         key: "demon_info",
         kind: "demon_info",
         title: "Información del Demonio",
-        instruction: "Despierta al Demonio. Enséñale la ficha ESTOS SON TUS ESBIRROS y señala a los Esbirros. Después enséñale ESTOS PERSONAJES NO ESTÁN EN JUEGO y los 3 faroles.",
+        instruction: later
+          ? "Ha muerto el Cultivador de opio: despierta al Demonio y enséñale la ficha ESTOS SON TUS ESBIRROS señalando a los Esbirros."
+          : "Despierta al Demonio. Enséñale la ficha ESTOS SON TUS ESBIRROS y señala a los Esbirros. Después enséñale ESTOS PERSONAJES NO ESTÁN EN JUEGO y los 3 faroles.",
         playerIds: demons.map((p) => p.id),
       },
     });

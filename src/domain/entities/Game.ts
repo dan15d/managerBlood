@@ -36,6 +36,8 @@ export interface Nomination {
   nomineeId: string;
   voterIds: string[];
   closed: boolean;
+  /** Exilio de un Viajero: vota todo el mundo y no es una ejecución. */
+  exile?: boolean;
 }
 
 export interface GameLogEntry {
@@ -61,6 +63,10 @@ export interface Game {
   nightStep: number;
   nominations: Nomination[];
   executedToday?: string;
+  /** La nominación extra del Carnicero hoy, después de la ejecución. */
+  butcherNominationId?: string;
+  /** Día extra de la Mente maestra (tras ejecutar al Demonio). */
+  mastermindDay?: number;
   /** Muertos esta noche: ya lo están en el Grimorio, pero la mesa no lo sabe hasta el amanecer. */
   nightDeaths?: string[];
   /** Muertos durante el día de hoy (el Zombuul solo ataca si no ha muerto nadie). */
