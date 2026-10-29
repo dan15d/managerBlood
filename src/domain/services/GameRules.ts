@@ -9,6 +9,7 @@ import {
   LEVIATHAN_GOOD_EXECUTED,
   LILMONSTA_BABYSITTER,
   lleechHost,
+  NEW_DEMON,
   reallyAlive,
   reminderFrom,
   ZOMBUUL_REALLY_DEAD,
@@ -281,8 +282,11 @@ export function startDay(game: Game): Game {
     nightDeaths: [],
     dayDeaths: [],
     butcherNominationId: undefined,
-    // El «No mata» de la Princesa solo valía la noche que acaba.
-    players: game.players.map((p) => ({ ...p, reminders: p.reminders.filter((r) => !(r.sourceCharacterId === "princess" && r.label === "No mata")) })),
+    // El «No mata» de la Princesa solo valía la noche que acaba, y al nuevo Demonio ya se le ha dicho.
+    players: game.players.map((p) => ({
+      ...p,
+      reminders: p.reminders.filter((r) => !(r.sourceCharacterId === "princess" && r.label === "No mata") && r.label !== NEW_DEMON),
+    })),
   };
   return touch(next, died.length ? `Amanece. Han muerto esta noche: ${died.join(", ")}.` : "Amanece. Nadie ha muerto esta noche.");
 }
@@ -567,6 +571,32 @@ export function executeNow(game: Game, playerId: string, reason?: string, charac
   const open = game.nominations.find((n) => !n.closed);
   const closed = open ? { ...game, nominations: game.nominations.map((n) => (n.id === open.id ? { ...n, closed: true } : n)) } : game;
   return execute(reason ? touch(closed, reason) : closed, playerId, characters);
+}
+
+/**
+ * El Exterminador dispara de día, en público. Solo pasa algo si quien dispara es de verdad el
+ * Exterminador, vivo y sin haber disparado: gasta el disparo y, si está sano y el elegido es el
+ * Demonio, el Demonio muere (no es una ejecución). El Recluso puede registrarse como Demonio:
+ * eso lo decide el Narrador.
+ */
+export function slayerShot(game: Game, shooterId: string, targetId: string, characters: Map<string, Character>): { game: Game; message: string } {
+  const shooter = findPlayer(game, shooterId);
+  const target = findPlayer(game, targetId);
+  if (!shooter || !target) throw new RuleViolation("Ese jugador no está en la partida.");
+  const shot = `${shooter.name} dispara a ${target.name}`;
+  const nothing = (why: string) => ({ game: touch(game, `${shot}: ${why}`), message: `${shot}: ${why}` });
+  if (shooter.characterId !== "slayer") return nothing("no es el Exterminador, no pasa nada.");
+  if (!shooter.alive) return nothing("está muerto y no tiene habilidad, no pasa nada.");
+  if (has(shooter, "slayer", "Sin habilidad")) return nothing("ya había disparado, no pasa nada.");
+  const used = withReminder(game, shooterId, "slayer", "Sin habilidad");
+  const done = (why: string, next = used) => ({ game: touch(next, `${shot}: ${why}`), message: `${shot}: ${why}` });
+  if (!healthy(shooter)) return done("está borracho o envenenado, no pasa nada (y gasta su disparo).");
+  if (!target.alive) return done("ya estaba muerto, no pasa nada.");
+  if (characters.get(target.characterId)?.team !== "demon") {
+    const recluse = target.characterId === "recluse" ? " El Recluso puede registrarse como Demonio: si lo decides, márcalo muerto." : "";
+    return done(`no es el Demonio, no pasa nada.${recluse}`);
+  }
+  return done("es el Demonio y muere.", killPlayer(used, targetId, "muere por el disparo del Exterminador"));
 }
 
 const VIRGIN_USED = "Sin habilidad";
@@ -903,7 +933,9 @@ export function succeedDemon(game: Game, succession: DemonSuccession, heirId: st
   }
   const demon = characters.get(succession.demon.characterId);
   if (!demon) throw new RuleViolation("No encuentro el personaje del Demonio.");
-  return setCharacter(game, heirId, demon);
+  const next = setCharacter(game, heirId, demon);
+  // De día no se le puede despertar: se le dice en su paso de esta noche.
+  return game.phase.kind === "day" ? withReminder(next, heirId, demon.id, NEW_DEMON) : next;
 }
 
 /** El Hereje (vivo o muerto, sano) invierte quién gana. */

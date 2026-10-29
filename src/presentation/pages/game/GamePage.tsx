@@ -34,7 +34,10 @@ type Pick =
   /** Ejecutar sin votación (Virgen, Juez, Visir, locura…). */
   | { kind: "execute" }
   /** Pedir el exilio de un Viajero. */
-  | { kind: "exile" };
+  | { kind: "exile" }
+  /** Disparo del Exterminador: primero quién dispara y después a quién. */
+  | { kind: "shooter" }
+  | { kind: "shot"; shooterId: string };
 
 export function GamePage() {
   const { id } = useParams();
@@ -176,6 +179,19 @@ export function GamePage() {
       setPick(null);
       return setTab("phase");
     }
+    if (pick.kind === "shooter") return setPick({ kind: "shot", shooterId: pid });
+    if (pick.kind === "shot") {
+      const shooterId = pick.shooterId;
+      let message = "";
+      change((g) => {
+        const result = rules.slayerShot(g, shooterId, pid, characters);
+        message = result.message;
+        return result.game;
+      });
+      if (message) toast(message);
+      setPick(null);
+      return setTab("phase");
+    }
     if (pick.kind === "nominator") {
       const problem = rules.canNominate(game, pid, "");
       if (problem) return toast(problem, "error");
@@ -216,6 +232,10 @@ export function GamePage() {
         ? "Toca al Viajero que se quiere exiliar"
       : pick.kind === "execute"
         ? "Toca al jugador que se ejecuta sin votación"
+      : pick.kind === "shooter"
+        ? "Toca a quien dispara (dice ser el Exterminador)"
+      : pick.kind === "shot"
+        ? `${name(pick.shooterId)} dispara a… toca al elegido`
       : pick.kind === "nominator"
         ? "Toca a quien nomina"
         : `${name(pick.nominatorId)} nomina a… toca al nominado`;
@@ -231,8 +251,10 @@ export function GamePage() {
             : game.players.map((p) => p.id)
           : pick?.kind === "exile"
             ? game.players.filter((p) => p.alive && characters.get(p.characterId)?.team === "traveller").map((p) => p.id)
-          : pick?.kind === "execute"
+          : pick?.kind === "execute" || pick?.kind === "shot"
             ? game.players.map((p) => p.id)
+          : pick?.kind === "shooter"
+            ? game.players.filter((p) => p.alive).map((p) => p.id)
             : (step?.playerIds ?? []);
 
   return (
@@ -448,6 +470,10 @@ export function GamePage() {
                   }}
                   onStartExecution={() => {
                     setPick({ kind: "execute" });
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  onStartShot={() => {
+                    setPick({ kind: "shooter" });
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                 />

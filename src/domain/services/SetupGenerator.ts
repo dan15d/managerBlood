@@ -151,14 +151,16 @@ export function applySetupEffects(
     );
     if (poisoned.length) log.push(`${poisoned.map((p) => p.name).join(" y ")}: envenenados por el No Dashii (Aldeanos vecinos).`);
   }
-  // Gemela malvada y Abuela: un jugador bueno al azar con su recordatorio (se puede cambiar a mano).
-  const marks: [string, string, string][] = [
-    ["eviltwin", "Gemelo", "es el gemelo bueno de la Gemela malvada"],
-    ["grandmother", "Nieto", "es el nieto de la Abuela"],
+  // Gemela malvada, Abuela y Pitonisa: un jugador bueno al azar con su recordatorio (se puede
+  // cambiar a mano). El falso positivo de la Pitonisa puede ser ella misma.
+  const marks: [string, string, string, boolean][] = [
+    ["eviltwin", "Gemelo", "es el gemelo bueno de la Gemela malvada", false],
+    ["grandmother", "Nieto", "es el nieto de la Abuela", false],
+    ["fortuneteller", "Falso positivo", "es el falso positivo de la Pitonisa", true],
   ];
-  for (const [source, label, text] of marks) {
+  for (const [source, label, text, self] of marks) {
     if (!result.some((p) => p.characterId === source)) continue;
-    const good = result.filter((p) => p.alignment === "good" && p.characterId !== source && isGoodTeam(characters.get(p.characterId)?.team ?? "traveller"));
+    const good = result.filter((p) => p.alignment === "good" && (self || p.characterId !== source) && isGoodTeam(characters.get(p.characterId)?.team ?? "traveller"));
     const chosen = pick(good, random);
     if (!chosen) continue;
     result = result.map((p) => (p.id === chosen.id ? { ...p, reminders: [...p.reminders, { id: newId(), sourceCharacterId: source, label }] } : p));

@@ -15,10 +15,12 @@ interface Props {
   onStartExecution: () => void;
   /** Exiliar a un Viajero tocándolo en el Grimorio. */
   onStartExile: () => void;
+  /** Disparo del Exterminador: se toca a quien dispara y a su elegido. */
+  onStartShot: () => void;
 }
 
 /** Nominaciones, votos y ejecución. El orden de voto empieza a la izquierda del nominado. */
-export function DayPanel({ game, characters, onChange, onStartNomination, onStartExecution, onStartExile }: Props) {
+export function DayPanel({ game, characters, onChange, onStartNomination, onStartExecution, onStartExile, onStartShot }: Props) {
   const [confirmDusk, setConfirmDusk] = useState(false);
   /** Recordatorios marcados para quitar al anochecer (null: la hoja está cerrada). */
   const [cleaning, setCleaning] = useState<string[] | null>(null);
@@ -141,6 +143,11 @@ export function DayPanel({ game, characters, onChange, onStartNomination, onStar
             {travellers.length > 0 && (
               <button className="btn btn--small btn--ghost" onClick={onStartExile}>
                 Exiliar a un Viajero…
+              </button>
+            )}
+            {game.players.some((p) => p.characterId === "slayer" || p.shownCharacterId === "slayer") && (
+              <button className="btn btn--small btn--ghost" onClick={onStartShot}>
+                Disparo del Exterminador…
               </button>
             )}
           </div>

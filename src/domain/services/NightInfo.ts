@@ -1,6 +1,6 @@
 import type { Character } from "../entities/Character";
 import type { Game, Player } from "../entities/Game";
-import { demonPlayers } from "./Demons";
+import { demonPlayers, NEW_DEMON } from "./Demons";
 
 // La respuesta verdadera de los personajes de información, calculada con el Grimorio.
 // Es una ayuda: el Narrador decide si la da (o da otra si está borracho, envenenado…).
@@ -156,7 +156,7 @@ function commonCaveats(game: Game, characters: Map<string, Character>, character
   const inPlay = new Set(game.players.map((p) => p.characterId));
   const caveats: string[] = [];
   const misregister = ["spy", "recluse"].filter((id) => inPlay.has(id)).map((id) => characters.get(id)!.name);
-  if (misregister.length) caveats.push(`${misregister.join(" y ")} puede aparecer distinto: decides tú.`);
+  if (misregister.length) caveats.push(`${misregister.join(" y ")} ${misregister.length > 1 ? "pueden aparecer distintos" : "puede aparecer distinto"}: decides tú.`);
   if (inPlay.has("vortox") && character.team === "townsfolk") caveats.push("Con Vortox en juego, la información de los Aldeanos debe ser falsa.");
   return caveats;
 }
@@ -308,7 +308,11 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
   };
 
   return players.flatMap((p) => {
-    const text = answer(p);
+    // Quien se ha convertido en el Demonio de día aún no lo sabe.
+    const fresh = p.alive && p.reminders.some((r) => r.label === NEW_DEMON)
+      ? `${p.name} se ha convertido hoy en ${character.name}: despiértale y enséñale TÚ ERES y la ficha de ${character.name}.`
+      : null;
+    const text = [fresh, answer(p)].filter(Boolean).join(" ");
     return text ? [{ playerId: p.id, text, caveats }] : [];
   });
 }

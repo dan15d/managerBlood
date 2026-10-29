@@ -12,6 +12,8 @@ export const ZOMBUUL_REALLY_DEAD = "Muerto de verdad";
 export const LILMONSTA_BABYSITTER = "Es el Demonio";
 /** El Leviatán ha visto ejecutar a este jugador bueno. */
 export const LEVIATHAN_GOOD_EXECUTED = "Bueno ejecutado";
+/** Se ha convertido en el Demonio de día (Mujer escarlata): esta noche hay que decírselo. */
+export const NEW_DEMON = "Nuevo Demonio";
 
 export const has = (p: Player, source: string, label: string) => p.reminders.some((r) => r.sourceCharacterId === source && r.label === label);
 

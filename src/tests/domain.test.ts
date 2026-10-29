@@ -344,7 +344,7 @@ describe("ayudas del Narrador", () => {
 
   it("avisa si el Espía o el Recluso pueden cambiar la respuesta", () => {
     const g = game(["empath", "recluse", "spy", "imp", "chef"]);
-    expect(hint(g, "empath")[0].caveats.join(" ")).toContain("puede aparecer distinto");
+    expect(hint(g, "empath")[0].caveats.join(" ")).toContain("Espía y Recluso pueden aparecer distintos");
   });
 
   it("el recordatorio del Envenenador se mueve en vez de duplicarse", () => {

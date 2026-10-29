@@ -4,6 +4,8 @@ import type { Game, Player } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { infoHints } from "@domain/services/NightInfo";
 import { buildNightOrder } from "@domain/services/NightOrder";
+import { seededRandom } from "@domain/services/Random";
+import { applySetupEffects } from "@domain/services/SetupGenerator";
 
 // Casos que salieron al jugar Bad Moon Rising y Sects & Violets en la web publicada.
 
@@ -118,6 +120,69 @@ describe("Sects & Violets", () => {
     expect(hint()).toContain("Falta");
     g = rules.addReminder(g, "p4", r("eviltwin", "Gemelo"));
     expect(hint()).toContain("El gemelo bueno es J5 (Oráculo)");
+  });
+});
+
+describe("Trouble Brewing", () => {
+  // Asientos: Exterminador, Diablillo, Mujer escarlata, Recluso, Chef, Empático.
+  const tb = () => game(["slayer", "imp", "scarletwoman", "recluse", "chef", "empath"], { phase: { kind: "day", number: 1 } });
+
+  it("Exterminador: si dispara al Demonio, muere (y no es una ejecución)", () => {
+    const g = game(["slayer", "imp", "poisoner", "chef", "empath"], { phase: { kind: "day", number: 1 } });
+    const shot = rules.slayerShot(g, "p0", "p1", map);
+    expect(alive(shot.game, "p1")).toBe(false);
+    expect(shot.message).toContain("es el Demonio y muere");
+    expect(shot.game.executedToday).toBeUndefined();
+    expect(rules.victoryHint(shot.game, map)?.winner).toBe("good");
+  });
+
+  it("Exterminador: con la Mujer escarlata y 5 vivos, ella pasa a ser el Demonio", () => {
+    const shot = rules.slayerShot(tb(), "p0", "p1", map);
+    expect(rules.demonSuccession(shot.game, map)?.heirs.map((p) => p.id)).toEqual(["p2"]);
+  });
+
+  it("la Mujer escarlata que pasa a ser el Demonio de día: esa noche se avisa de despertarla", () => {
+    const shot = rules.slayerShot(tb(), "p0", "p1", map);
+    const s = rules.demonSuccession(shot.game, map)!;
+    let g = rules.startNight(rules.succeedDemon(shot.game, s, "p2", map));
+    const hint = infoHints(g, catalog.get("imp")!, map).find((h) => h.playerId === "p2")?.text;
+    expect(hint).toContain("J3 se ha convertido hoy en Diablillo: despiértale y enséñale TÚ ERES");
+    // Al amanecer ya se le ha dicho.
+    g = rules.startDay(g);
+    expect(g.players[2].reminders.some((x) => x.label === "Nuevo Demonio")).toBe(false);
+  });
+
+  it("los avisos de Espía y Recluso concuerdan", () => {
+    const g = game(["washerwoman", "imp", "spy", "recluse", "chef"], { phase: { kind: "night", number: 1 } });
+    expect(infoHints(g, catalog.get("washerwoman")!, map)[0].caveats[0]).toBe("Espía y Recluso pueden aparecer distintos: decides tú.");
+  });
+
+  it("Exterminador: falla con quien no es Demonio, avisa del Recluso y solo dispara una vez", () => {
+    let g = rules.slayerShot(tb(), "p0", "p3", map);
+    expect(g.message).toContain("Recluso puede registrarse como Demonio");
+    expect(alive(g.game, "p3")).toBe(true);
+    g = rules.slayerShot(g.game, "p0", "p1", map);
+    expect(g.message).toContain("ya había disparado");
+    expect(alive(g.game, "p1")).toBe(true);
+  });
+
+  it("Exterminador: quien no lo es, o lo es envenenado, no mata", () => {
+    expect(alive(rules.slayerShot(tb(), "p4", "p1", map).game, "p1")).toBe(true);
+    const poisoned = rules.addReminder(tb(), "p0", r("poisoner", "Envenenado"));
+    const shot = rules.slayerShot(poisoned, "p0", "p1", map);
+    expect(alive(shot.game, "p1")).toBe(true);
+    expect(rules.slayerShot(shot.game, "p0", "p1", map).message).toContain("ya había disparado");
+  });
+
+  it("Pitonisa: el falso positivo se pone solo en un jugador bueno", () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const players = game(["fortuneteller", "imp", "poisoner", "chef", "empath"]).players;
+      const { players: placed, log } = applySetupEffects(players, map, seededRandom(seed), () => `id${seed}`);
+      const herring = placed.filter((p) => p.reminders.some((x) => x.sourceCharacterId === "fortuneteller" && x.label === "Falso positivo"));
+      expect(herring).toHaveLength(1);
+      expect(herring[0].alignment).toBe("good");
+      expect(log.join(" ")).toContain("falso positivo de la Pitonisa");
+    }
   });
 });
 
