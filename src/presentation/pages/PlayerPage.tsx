@@ -1,30 +1,27 @@
 import type { Character } from "@domain/entities/Character";
-import { TEAM_LABEL } from "@domain/entities/Character";
 import type { PlayerView } from "@domain/entities/Table";
-import { TOR } from "@domain/services/SpecialRules";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
-import { CharacterGuide } from "../components/CharacterGuide";
 import { ScriptCharacterList } from "../components/ScriptCharacterList";
 import { Confirm, Sheet } from "../components/Sheet";
 import { SeatCircle } from "../components/SeatCircle";
 import { Token } from "../components/Token";
 import { usePlayerNotes, type SeatNote } from "../hooks/usePlayerNotes";
-import { Eye, EyeOff, Flag, Moon, NotebookPen, ScrollText, Sun, Users, VenetianMask } from "lucide-react";
+import { Flag, Moon, NotebookPen, ScrollText, Sun, Users } from "lucide-react";
 
-type Tab = "me" | "script" | "players";
+type Tab = "script" | "players";
 
-/** El móvil de cada jugador: su personaje, el guion y la mesa, al día sin recargar. */
+/**
+ * El móvil de cada jugador: la mesa y el guion, al día sin recargar. Su personaje no: se lo
+ * enseña el Narrador en persona, como con la ficha física.
+ */
 export function PlayerPage() {
   const { gameId = "", seatId = "" } = useParams();
   const { app, toast } = useApp();
   const navigate = useNavigate();
   const [view, setView] = useState<PlayerView | null | undefined>(undefined);
-  const [tab, setTab] = useState<Tab>("me");
-  const [revealed, setRevealed] = useState(false);
-  /** Se está manteniendo pulsada la ficha (al soltar se oculta). */
-  const [holding, setHolding] = useState(false);
+  const [tab, setTab] = useState<Tab>("players");
   const [leaving, setLeaving] = useState(false);
   const [noting, setNoting] = useState<string | null>(null);
   const { notes, update: updateNote } = usePlayerNotes(gameId);
@@ -34,24 +31,6 @@ export function PlayerPage() {
     return app.player.watch(gameId, seatId, setView);
   }, [app, gameId, seatId]);
 
-  // Cuando el Narrador cambia el personaje, se vuelve a ocultar para que nadie lo vea de rebote.
-  const characterId = view?.characterId;
-  useEffect(() => setRevealed(false), [characterId]);
-
-  // A la vista se oculta solo: al salir de la app, al cambiar de pestaña o al minuto.
-  useEffect(() => {
-    const hide = () => document.visibilityState !== "visible" && setRevealed(false);
-    document.addEventListener("visibilitychange", hide);
-    return () => document.removeEventListener("visibilitychange", hide);
-  }, []);
-  useEffect(() => {
-    if (!revealed || holding) return;
-    const timer = setTimeout(() => setRevealed(false), 60_000);
-    return () => clearTimeout(timer);
-  }, [revealed, holding]);
-  useEffect(() => setRevealed(false), [tab]);
-
-  const character = characterId ? app.catalog.get(characterId) : undefined;
   const alive = view?.players.filter((p) => p.alive).length ?? 0;
   const script = useMemo(
     () => (view?.characterIds ?? []).map((id) => app.catalog.get(id)).filter((c): c is Character => !!c),
@@ -108,110 +87,15 @@ export function PlayerPage() {
         </div>
       )}
 
+      {/* Sin pestaña del personaje: lo enseña el Narrador en persona, para que nadie pueda enseñar la pantalla como prueba. */}
       <div className="tabs tabs--page" role="tablist">
-        <button className="tab" role="tab" aria-selected={tab === "me"} onClick={() => setTab("me")}>
-          <VenetianMask /> Mi personaje
+        <button className="tab" role="tab" aria-selected={tab === "players"} onClick={() => setTab("players")}>
+          <Users /> Mesa
         </button>
         <button className="tab" role="tab" aria-selected={tab === "script"} onClick={() => setTab("script")}>
           <ScrollText /> Guion
         </button>
-        <button className="tab" role="tab" aria-selected={tab === "players"} onClick={() => setTab("players")}>
-          <Users /> Mesa
-        </button>
       </div>
-
-      {tab === "me" &&
-        (!character ? (
-          <section className="reveal">
-            <div className="token token--hidden" style={{ "--size": "160px" } as CSSProperties}>
-              <span className="token__mark" style={{ color: "var(--muted)", filter: "none" }}>
-                ?
-              </span>
-            </div>
-            {view.status !== "lobby" && view.fabledIds.includes(TOR) ? (
-              <>
-                <h2>No conoces tu personaje</h2>
-                <p className="muted">Se juega con Tor: nadie sabe su personaje ni su bando. Lo descubrirás al morir.</p>
-              </>
-            ) : (
-              <>
-                <h2>Esperando al Narrador…</h2>
-                <p className="muted">
-                  Estás en la sala. Cuando el Narrador reparta, tu personaje aparecerá aquí solo, sin recargar.
-                </p>
-              </>
-            )}
-            {view.status === "lobby" && (
-              <button className="btn btn--ghost" onClick={() => setLeaving(true)}>
-                Salir de la sala
-              </button>
-            )}
-          </section>
-        ) : (
-          <section className="reveal" style={{ minHeight: "auto", paddingTop: 12 }}>
-            {/* Mantener pulsado para mirar: al soltar se oculta. Con teclado, Intro lo muestra y lo oculta. */}
-            <button
-              type="button"
-              className="reveal__toggle reveal__toggle--hold"
-              onPointerDown={(e) => {
-                e.currentTarget.setPointerCapture(e.pointerId);
-                setHolding(true);
-                setRevealed(true);
-              }}
-              onPointerUp={() => {
-                if (holding) setRevealed(false);
-                setHolding(false);
-              }}
-              onPointerCancel={() => {
-                setHolding(false);
-                setRevealed(false);
-              }}
-              onClick={(e) => e.detail === 0 && setRevealed(!revealed)}
-              onContextMenu={(e) => e.preventDefault()}
-              aria-label={revealed ? "Ocultar mi personaje" : "Ver mi personaje (mantén pulsado)"}
-            >
-              <Token character={character} alignment={view.alignment} size={200} hidden={!revealed} dead={!view.alive} />
-            </button>
-            {revealed ? (
-              <>
-                <h1 className={`team-${character.team}`} style={{ margin: 0 }}>
-                  {character.name}
-                </h1>
-                <span className={`badge team-${view.alignment === "evil" ? "demon" : "townsfolk"}`}>
-                  {TEAM_LABEL[character.team].singular} · {view.alignment === "evil" ? "Malvado" : "Bueno"}
-                </span>
-                <p className="ability" style={{ textAlign: "left", maxWidth: 480 }}>
-                  {character.ability}
-                </p>
-                {/* La guía del personaje que cree ser (el Borracho ve la de su Aldeano), sin nada de la partida. */}
-                <div style={{ width: "100%", maxWidth: 480, textAlign: "left" }}>
-                  <CharacterGuide key={character.id} characterId={character.id} audience="player" />
-                </div>
-                {!holding && (
-                  <button className="btn btn--ghost" onClick={() => setRevealed(false)}>
-                    <EyeOff /> Ocultar
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <p className="muted" style={{ margin: 0 }}>
-                  Mantén pulsada la ficha para mirar tu personaje; al soltar se oculta. Que nadie mire tu pantalla.
-                </p>
-                <button className="btn btn--ghost btn--small" onClick={() => setRevealed(true)}>
-                  <Eye /> Dejarlo a la vista para leer la guía
-                </button>
-              </>
-            )}
-            <div className={`alert ${view.alive ? "alert--ok" : "alert--warning"}`} style={{ width: "100%", maxWidth: 480 }}>
-              {view.alive
-                ? "Estás vivo."
-                : view.ghostVoteUsed
-                  ? "Estás muerto y ya has gastado tu voto."
-                  : "Estás muerto. Te queda un voto para el resto de la partida."}
-            </div>
-          </section>
-        ))}
 
       {tab === "script" && (
         <>
@@ -227,10 +111,28 @@ export function PlayerPage() {
 
       {tab === "players" && (
         <section>
-          {view.players.length === 0 ? (
+          {view.status === "lobby" ? (
+            <div className="stack" style={{ gap: 12 }}>
+              <h2 style={{ margin: 0 }}>Esperando al Narrador…</h2>
+              <p className="muted" style={{ margin: 0 }}>
+                Estás en la sala. Cuando empiece la partida, el Narrador te enseñará tu personaje en persona. Aquí verás la mesa:
+                quién sigue vivo, los votos y tus notas.
+              </p>
+              <button className="btn btn--ghost" style={{ alignSelf: "flex-start" }} onClick={() => setLeaving(true)}>
+                Salir de la sala
+              </button>
+            </div>
+          ) : view.players.length === 0 ? (
             <p className="muted">La lista aparecerá cuando empiece la partida.</p>
           ) : (
             <>
+              <div className={`alert ${view.alive ? "alert--ok" : "alert--warning"}`} style={{ marginBottom: 12 }}>
+                {view.alive
+                  ? "Estás vivo."
+                  : view.ghostVoteUsed
+                    ? "Estás muerto y ya has gastado tu voto."
+                    : "Estás muerto. Te queda un voto para el resto de la partida."}
+              </div>
               <SeatCircle
                 items={view.players}
                 itemKey={(p) => String(p.seat)}

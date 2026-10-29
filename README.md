@@ -3,7 +3,7 @@
 Webapp de Blood on the Clocktower pensada primero para el móvil, con dos modos:
 
 - **Narrador** (con contraseña): prepara la partida en modo **manual** o con **IA** (OpenRouter + DeepSeek), abre una sala con código y QR, reparte y lleva el Grimorio: noche paso a paso, votos y final.
-- **Jugador** (sin cuenta): se une con el código, ve su personaje (el Borracho ve el falso), la lista de personajes del guion, la fase y quién sigue vivo. Todo llega en tiempo real.
+- **Jugador** (sin cuenta): se une con el código y ve la lista de personajes del guion, la fase y quién sigue vivo, en tiempo real. Su personaje **no** sale en su móvil: se lo enseña el Narrador en persona («Repartir», o «Enseñar un personaje» por la noche), como con la ficha física, para que nadie pueda enseñar la pantalla como prueba.
 
 Se puede instalar en el móvil desde el navegador («Añadir a pantalla de inicio»).
 
@@ -32,7 +32,7 @@ Se puede instalar en el móvil desde el navegador («Añadir a pantalla de inici
   - **Información para el Narrador:**
     - El **Tahúr** y la **Sirvienta** reciben su respuesta.
 - Demonios con reglas propias: el **Pukka** mata a su víctima anterior al envenenar a otra; el **Fang Gu** salta al primer Forastero; el **Zombuul** parece muerto la primera vez y solo ataca si nadie ha muerto ese día; el **Lleech** envenena a su huésped y no muere mientras viva; **Lil' Monsta** no va en la bolsa (lo cuida un Esbirro); el **Vortox** y el **Leviatán** avisan de la victoria del Mal; el **Shabaloth** regurgita; y el **No Dashii** envenena a sus Aldeanos vecinos desde el principio.
-- Para el jugador: **mantener pulsada la ficha** para ver su personaje (se oculta al soltar, al salir de la app o al minuto) y **notas privadas** sobre los demás (qué dicen ser y qué cree que son), guardadas solo en su móvil.
+- Para el jugador: la **mesa** (vivos, votos fantasma, si él está vivo), el **guion** con la guía de cada personaje y **notas privadas** sobre los demás (qué dicen ser y qué cree que son), guardadas solo en su móvil.
 - «Repartir»: se pasa el móvil y cada jugador ve su personaje en secreto.
 
 ## Empezar

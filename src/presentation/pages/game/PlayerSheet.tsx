@@ -100,7 +100,7 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
           )}
           {decoyTeam && (
             <label className="field" style={{ marginTop: 10 }}>
-              <span>Cree ser (es lo que ve en su móvil)</span>
+              <span>Cree ser (es lo que le enseñas al repartir)</span>
               <select
                 className="input"
                 value={player.shownCharacterId ?? ""}
