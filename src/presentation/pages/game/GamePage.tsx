@@ -9,6 +9,7 @@ import { CharacterPicker } from "../../components/CharacterPicker";
 import { Sheet } from "../../components/Sheet";
 import { AiPanel } from "./AiPanel";
 import { DayPanel } from "./DayPanel";
+import { FabledBar } from "./FabledBar";
 import { Grimoire } from "./Grimoire";
 import { NightPanel } from "./NightPanel";
 import { PlayerSheet } from "./PlayerSheet";
@@ -220,16 +221,28 @@ export function GamePage() {
       )}
 
       <div className="game-layout">
-        <Grimoire
-          game={game}
-          characters={characters}
-          hidden={hidden}
-          highlighted={highlighted}
-          picking={!!pick}
-          centerNote={night && step ? `${Math.min(game.nightStep, steps.length - 1) + 1}/${steps.length} · ${step.title}` : undefined}
-          onSelect={tapPlayer}
-          onRemoveReminder={(pid, rid) => change((g) => rules.removeReminder(g, pid, rid))}
-        />
+        <div>
+          <Grimoire
+            game={game}
+            characters={characters}
+            hidden={hidden}
+            highlighted={highlighted}
+            picking={!!pick}
+            centerNote={night && step ? `${Math.min(game.nightStep, steps.length - 1) + 1}/${steps.length} · ${step.title}` : undefined}
+            onSelect={tapPlayer}
+            onRemoveReminder={(pid, rid) => change((g) => rules.removeReminder(g, pid, rid))}
+          />
+          <FabledBar
+            game={game}
+            characters={characters}
+            jinxes={app.catalog.jinxes()}
+            onChange={change}
+            onPickReminder={(sourceId, label) => {
+              setPick({ kind: "reminder", sourceId, label });
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          />
+        </div>
 
         <section className="card panel">
           <div className="tabs" role="tablist">
@@ -291,6 +304,7 @@ export function GamePage() {
           player={player}
           characters={characters}
           scriptCharacters={scriptCharacters}
+          jinxes={app.catalog.jinxes()}
           newId={app.newId}
           onChange={change}
           onClose={() => setSelected(null)}

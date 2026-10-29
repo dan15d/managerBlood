@@ -1,6 +1,7 @@
 import type { Character } from "@domain/entities/Character";
 import { TEAM_LABEL } from "@domain/entities/Character";
 import type { PlayerView } from "@domain/entities/Table";
+import { TOR } from "@domain/services/SpecialRules";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
@@ -36,6 +37,10 @@ export function PlayerPage() {
   const script = useMemo(
     () => (view?.characterIds ?? []).map((id) => app.catalog.get(id)).filter((c): c is Character => !!c),
     [app, view?.characterIds],
+  );
+  const fabled = useMemo(
+    () => (view?.fabledIds ?? []).map((id) => app.catalog.get(id)).filter((c): c is Character => !!c),
+    [app, view?.fabledIds],
   );
 
   if (view === undefined) return <main className="page page--flow muted">Conectando con la mesa…</main>;
@@ -104,10 +109,19 @@ export function PlayerPage() {
                 ?
               </span>
             </div>
-            <h2>Esperando al Narrador…</h2>
-            <p className="muted">
-              Estás en la sala. Cuando el Narrador reparta, tu personaje aparecerá aquí solo, sin recargar.
-            </p>
+            {view.status !== "lobby" && view.fabledIds.includes(TOR) ? (
+              <>
+                <h2>No conoces tu personaje</h2>
+                <p className="muted">Se juega con Tor: nadie sabe su personaje ni su bando. Lo descubrirás al morir.</p>
+              </>
+            ) : (
+              <>
+                <h2>Esperando al Narrador…</h2>
+                <p className="muted">
+                  Estás en la sala. Cuando el Narrador reparta, tu personaje aparecerá aquí solo, sin recargar.
+                </p>
+              </>
+            )}
             {view.status === "lobby" && (
               <button className="btn btn--ghost" onClick={() => setLeaving(true)}>
                 Salir de la sala
@@ -152,7 +166,17 @@ export function PlayerPage() {
           </section>
         ))}
 
-      {tab === "script" && <ScriptCharacterList characters={script} />}
+      {tab === "script" && (
+        <>
+          {fabled.length > 0 && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <h2 style={{ margin: 0 }}>Anunciados por el Narrador</h2>
+              <ScriptCharacterList characters={fabled} />
+            </div>
+          )}
+          <ScriptCharacterList characters={script} />
+        </>
+      )}
 
       {tab === "players" && (
         <section>

@@ -1,5 +1,5 @@
 import type { SetupStyle } from "@application/ports/AiStoryteller";
-import { TEAM_LABEL, type Character } from "@domain/entities/Character";
+import { isGoodTeam, isStorytellerTeam, TEAM_LABEL, type Character } from "@domain/entities/Character";
 import type { GameMode } from "@domain/entities/Game";
 import type { Script } from "@domain/entities/Script";
 import type { Lobby, Seat } from "@domain/entities/Table";
@@ -8,11 +8,13 @@ import {
   MAX_PLAYERS,
   maxTravellers,
   MIN_PLAYERS,
+  SETUP_MODIFIERS,
   targetDistribution,
   travellerCount,
   travellerSeats,
   validateSelection,
 } from "@domain/services/SetupRules";
+import { defaultFabled, DJINN, GARDENER, jinxesAmong, POPE } from "@domain/services/SpecialRules";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
@@ -21,6 +23,7 @@ import { LobbyPanel } from "../components/LobbyPanel";
 import { Token } from "../components/Token";
 import { useAsync } from "../hooks/useAsync";
 import { EditionBanner } from "../components/EditionBanner";
+import { JinxList } from "../components/JinxList";
 import { BookOpen, Check, Dices, PenLine, Pencil, Scale, Search, Shuffle, Skull, Sparkles, Sprout, Tornado, VenetianMask } from "lucide-react";
 
 const STEPS = ["Modo", "Guion", "Jugadores", "Personajes", "Reparto"] as const;
@@ -56,6 +59,7 @@ export function NewGamePage() {
   const [decoys, setDecoys] = useState<Record<string, string>>({});
   const [bluffs, setBluffs] = useState<string[]>([]);
   const [travellers, setTravellers] = useState<string[]>([]);
+  const [fabled, setFabled] = useState<string[]>([]);
   // Viajero → asiento que ha elegido el Narrador (si no, ocupan los últimos asientos).
   const [chosenTravellerSeats, setChosenTravellerSeats] = useState<Record<string, number>>({});
   const [style, setStyle] = useState<SetupStyle>("equilibrada");
@@ -120,15 +124,22 @@ export function NewGamePage() {
     const own = pool.filter((c) => c.team === "traveller");
     return own.length ? own : app.catalog.all().filter((c) => c.team === "traveller");
   }, [app, pool]);
+  const fabledPool = useMemo(() => app.catalog.all().filter((c) => isStorytellerTeam(c.team)), [app]);
+  // Al cambiar de guion: sus Fábulas y Lóricos, y el Djinn si tiene incompatibilidades.
+  useEffect(() => setFabled(defaultFabled(pool, app.catalog.jinxes())), [app, pool]);
   const forcedTravellers = travellerCount(playerCount);
   const bagCount = playerCount - Math.max(travellers.length, forcedTravellers);
   const travellerBySeat = travellerSeats(playerCount, travellers, chosenTravellerSeats);
   const bagSeats = Array.from({ length: playerCount }, (_, seat) => seat).filter((seat) => !(seat in travellerBySeat));
   const bagAssignment = Object.fromEntries(Object.entries(assignment).filter(([seat]) => bagSeats.includes(Number(seat))));
   const chosen = selected.map((id) => app.catalog.get(id)!).filter(Boolean);
-  const issues = validateSelection(bagCount, chosen);
+  const fabledChosen = fabled.map((id) => app.catalog.get(id)!).filter(Boolean);
+  const issues = validateSelection(bagCount, [...chosen, ...fabledChosen]);
   const errors = issues.filter((i) => i.level === "error");
-  const target = targetDistribution(bagCount, chosen);
+  const target = targetDistribution(bagCount, [...chosen, ...fabledChosen]);
+  const pope = fabled.includes(POPE);
+  const repeatable = (c: Character) => (pope && isGoodTeam(c.team)) || (SETUP_MODIFIERS[c.id]?.copies ?? 1) > 1;
+  const jinxes = jinxesAmong([...selected, ...Object.values(decoys), ...fabled, ...travellers], app.catalog.jinxes());
   const playerNames = Array.from({ length: playerCount }, (_, i) => names[i]?.trim() || `Jugador ${i + 1}`);
 
   // Si quedan menos jugadores, sobran Viajeros: la bolsa nunca baja de 5.
@@ -241,6 +252,7 @@ export function NewGamePage() {
         decoys,
         assignment: manualSeats ? bagAssignment : undefined,
         travellers: travellerBySeat,
+        fabledIds: fabled,
         aiNotes: notes,
         table: lobby ? { gameId: lobby.gameId, joinCode: lobby.joinCode, seats } : undefined,
       });
@@ -440,6 +452,29 @@ export function NewGamePage() {
             />
           </details>
 
+          <details className="card travellers-card" open={fabled.length > 0}>
+            <summary>
+              <span className="team-fabled">
+                {TEAM_LABEL.fabled.plural} y {TEAM_LABEL.loric.plural}
+              </span>
+              <span className="muted small">opcional</span>
+              <span className="spacer" />
+              {fabled.length > 0 && <span className="counter">{fabled.length}</span>}
+            </summary>
+            <p className="muted small">
+              Personajes del Narrador: no son jugadores ni van en la bolsa, y se anuncian a toda la mesa.
+              {pool.some((c) => isStorytellerTeam(c.team)) && " Ya vienen marcados los del guion."}
+              {jinxesAmong(script.characterIds, app.catalog.jinxes()).length > 0 && " El Djinn también, porque el guion tiene incompatibilidades."}{" "}
+              Algunos cambian la preparación (Centinela, Papa) o la noche (Juguetero, Tor). También los puedes poner o quitar durante la partida.
+            </p>
+            <CharacterPicker
+              characters={fabledPool}
+              teams={["fabled", "loric"]}
+              selected={fabled}
+              onToggle={(id) => setFabled((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]))}
+            />
+          </details>
+
           {mode === "ai" && !editingAi && (
             <div className="card stack" style={{ marginBottom: 16 }}>
               <h2 style={{ margin: 0 }}>¿Qué partida quieres?</h2>
@@ -504,7 +539,14 @@ export function NewGamePage() {
                 teams={["townsfolk", "outsider", "minion", "demon"]}
                 selected={selected}
                 target={target}
-                onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
+                repeatable={repeatable}
+                onAdd={(id) => setSelected((s) => [...s, id])}
+                onToggle={(id) =>
+                  setSelected((s) => {
+                    const i = s.lastIndexOf(id);
+                    return i >= 0 ? [...s.slice(0, i), ...s.slice(i + 1)] : [...s, id];
+                  })
+                }
               />
             </>
           )}
@@ -516,6 +558,15 @@ export function NewGamePage() {
                   {i.message}
                 </div>
               ))}
+              {jinxes.length > 0 && (
+                <div className="card stack">
+                  <h2 style={{ margin: 0 }}>Incompatibilidades en juego</h2>
+                  <p className="muted small" style={{ margin: 0 }}>
+                    Reglas especiales de la wiki para estos personajes juntos.{fabled.includes(DJINN) ? " El Djinn las anuncia a la mesa." : ""}
+                  </p>
+                  <JinxList jinxes={jinxes} characters={app.catalog.map()} />
+                </div>
+              )}
               <DecoyAndBluffs
                 pool={pool}
                 selected={selected}
@@ -560,6 +611,11 @@ export function NewGamePage() {
               onClick={() => setManualSeats(true)}
             />
           </div>
+          {fabled.includes(GARDENER) && !manualSeats && (
+            <div className="alert alert--info small">
+              Con el Jardinero puedes asignar tú los personajes: elige «Asignar a mano».
+            </div>
+          )}
           {travellers.length > 0 && (
             <div className="card stack">
               <h2 style={{ margin: 0 }}>¿Quién es Viajero?</h2>
@@ -603,8 +659,13 @@ export function NewGamePage() {
                     }}
                   >
                     <option value="">— Elige —</option>
-                    {chosen
-                      .filter((c) => bagAssignment[seat] === c.id || !Object.values(bagAssignment).includes(c.id))
+                    {/* Cada ficha una vez, salvo las repetidas (Papa, Tonto del pueblo), que salen tantas veces como estén. */}
+                    {[...new Map(chosen.map((c) => [c.id, c])).values()]
+                      .filter(
+                        (c) =>
+                          bagAssignment[seat] === c.id ||
+                          Object.values(bagAssignment).filter((id) => id === c.id).length < selected.filter((id) => id === c.id).length,
+                      )
                       .map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}

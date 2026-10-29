@@ -1,4 +1,5 @@
 import type { Character, Team } from "../entities/Character";
+import type { Player } from "../entities/Game";
 import { pick, shuffle, type RandomFn } from "./Random";
 import {
   allowedDistributions,
@@ -67,7 +68,9 @@ export function pickDecoys(
     const team = DECOYS[c.id];
     if (!team) continue;
     const wanted = preferred[c.id];
-    const candidates = scriptCharacters.filter((s) => s.team === team && !used.has(s.id));
+    // La Marioneta no puede creer ser el Rey si está el Niño del coro (wiki: interacción Marioneta-Rey).
+    const forbidden = c.id === "marionette" && used.has("choirboy") ? "king" : undefined;
+    const candidates = scriptCharacters.filter((s) => s.team === team && !used.has(s.id) && s.id !== forbidden);
     const chosen = candidates.find((s) => s.id === wanted) ?? pick(candidates, random);
     if (chosen) {
       result[c.id] = chosen.id;
@@ -86,4 +89,57 @@ export function pickBluffs(excludedIds: Iterable<string>, scriptCharacters: Char
   const bluffs = [...townsfolk.slice(0, 2), ...outsiders.slice(0, 1)];
   for (const c of townsfolk.slice(2)) if (bluffs.length < 3) bluffs.push(c);
   return bluffs.map((c) => c.id);
+}
+
+/**
+ * La Marioneta empieza junto al Demonio. Si al sacar de la bolsa ha caído lejos, cambia la
+ * ficha con un vecino del Demonio (nunca con un Viajero).
+ */
+export function seatMarionette(players: Player[], characters: Map<string, Character>, random: RandomFn): Player[] {
+  const team = (p: Player) => characters.get(p.characterId)?.team;
+  const marionette = players.find((p) => p.characterId === "marionette");
+  const demon = players.find((p) => team(p) === "demon");
+  if (!marionette || !demon) return players;
+  const n = players.length;
+  const neighbours = players.filter((p) => p.seat === (demon.seat + 1) % n || p.seat === (demon.seat - 1 + n) % n);
+  if (neighbours.includes(marionette)) return players;
+  const other = pick(neighbours.filter((p) => team(p) !== "traveller" && p !== demon), random);
+  if (!other) return players;
+  const swap = (p: Player, from: Player): Player => ({
+    ...p,
+    characterId: from.characterId,
+    shownCharacterId: from.shownCharacterId,
+    alignment: from.alignment,
+  });
+  return players.map((p) => (p === marionette ? swap(p, other) : p === other ? swap(p, marionette) : p));
+}
+
+/**
+ * Lo que la preparación hace después de repartir: el Cazarrecompensas vuelve malo a un Aldeano
+ * y, si hay varios Tontos del pueblo, uno está borracho. Devuelve los jugadores y qué se ha hecho.
+ */
+export function applySetupEffects(
+  players: Player[],
+  characters: Map<string, Character>,
+  random: RandomFn,
+  newId: () => string,
+): { players: Player[]; log: string[] } {
+  const log: string[] = [];
+  let result = players;
+  if (players.some((p) => p.characterId === "bountyhunter")) {
+    const target = pick(players.filter((p) => characters.get(p.characterId)?.team === "townsfolk" && p.characterId !== "bountyhunter"), random);
+    if (target) {
+      result = result.map((p) => (p.id === target.id ? { ...p, alignment: "evil" } : p));
+      log.push(`${target.name} es el Aldeano malo del Cazarrecompensas: díselo cuando le enseñes su personaje.`);
+    }
+  }
+  const idiots = result.filter((p) => p.characterId === "villageidiot");
+  if (idiots.length > 1) {
+    const drunk = pick(idiots, random)!;
+    result = result.map((p) =>
+      p.id === drunk.id ? { ...p, reminders: [...p.reminders, { id: newId(), sourceCharacterId: "villageidiot", label: "Borracho" }] } : p,
+    );
+    log.push(`${drunk.name} es el Tonto del pueblo borracho.`);
+  }
+  return { players: result, log };
 }

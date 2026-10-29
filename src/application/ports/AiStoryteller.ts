@@ -1,4 +1,4 @@
-import type { Character } from "@domain/entities/Character";
+import type { Character, Jinx } from "@domain/entities/Character";
 import type { Game } from "@domain/entities/Game";
 import type { Distribution } from "@domain/services/SetupRules";
 
@@ -30,6 +30,8 @@ export interface AiSetupProposal {
 export interface AiAdviceRequest {
   game: Game;
   characters: Map<string, Character>;
+  /** Incompatibilidades entre los personajes en juego. */
+  jinxes: Jinx[];
   question: string;
 }
 

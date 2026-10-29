@@ -15,10 +15,13 @@ interface Props {
   target?: Distribution;
   teams?: Team[];
   searchable?: boolean;
+  /** Personajes que pueden ir repetidos (con el Papa, el Tonto del pueblo): botón «+1». Tocar la ficha quita una copia. */
+  repeatable?: (c: Character) => boolean;
+  onAdd?: (id: string) => void;
 }
 
 /** Rejilla de personajes agrupados por tipo, con la habilidad visible para elegir sin dudas. */
-export function CharacterPicker({ characters, selected, onToggle, target, teams = TEAM_ORDER, searchable }: Props) {
+export function CharacterPicker({ characters, selected, onToggle, target, teams = TEAM_ORDER, searchable, repeatable, onAdd }: Props) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const visible = q
@@ -42,7 +45,7 @@ export function CharacterPicker({ characters, selected, onToggle, target, teams 
       {teams.map((team) => {
         const list = visible.filter((c) => c.team === team);
         if (!list.length) return null;
-        const count = characters.filter((c) => c.team === team && selected.includes(c.id)).length;
+        const count = selected.filter((id) => characters.some((c) => c.id === id && c.team === team)).length;
         const want = target && team in target ? target[team as keyof Distribution] : undefined;
         return (
           <section key={team} className="team-section">
@@ -58,17 +61,30 @@ export function CharacterPicker({ characters, selected, onToggle, target, teams 
             </div>
             <div className="picker-grid">
               {list.map((c) => {
-                const on = selected.includes(c.id);
-                return (
+                const copies = selected.filter((id) => id === c.id).length;
+                const on = copies > 0;
+                const pickButton = (
                   <button key={c.id} type="button" className="pick" aria-pressed={on} onClick={() => onToggle(c.id)}>
                     <Token character={c} size={44} dim={!on} />
                     <span className="pick__body">
-                      <span className="pick__name">{c.name}</span>
+                      <span className="pick__name">
+                        {c.name}
+                        {copies > 1 && <span className="team-fabled"> ×{copies}</span>}
+                      </span>
                       <span className="pick__ability">{c.ability}</span>
                       {SETUP_MODIFIERS[c.id] && <span className="pick__flag"><Settings2 /> {SETUP_MODIFIERS[c.id].note}</span>}
                       {DECOYS[c.id] && <span className="pick__flag"><VenetianMask /> No sabe quién es</span>}
                     </span>
                   </button>
+                );
+                if (!on || !onAdd || !repeatable?.(c)) return pickButton;
+                return (
+                  <div key={c.id} className="pick-wrap">
+                    {pickButton}
+                    <button type="button" className="btn btn--small pick__more" aria-label={`Otro ${c.name}`} onClick={() => onAdd(c.id)}>
+                      +1
+                    </button>
+                  </div>
                 );
               })}
             </div>

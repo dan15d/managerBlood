@@ -1,4 +1,5 @@
 import type { Character } from "@domain/entities/Character";
+import { isStorytellerTeam, TEAM_LABEL } from "@domain/entities/Character";
 import type { Game } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import type { NightStep } from "@domain/services/NightOrder";
@@ -103,7 +104,13 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
             : sin habilidad esta noche. Despiértalo igual y dale información falsa si te conviene.
           </div>
         )}
-        {step.kind === "character" && step.playerIds.length === 0 && <p className="muted small">Nadie en juego.</p>}
+        {step.kind === "character" && step.playerIds.length === 0 && (
+          <p className="muted small">
+            {step.character && isStorytellerTeam(step.character.team)
+              ? `${TEAM_LABEL[step.character.team].singular} en juego: no es un jugador, lo resuelves tú.`
+              : "Nadie en juego."}
+          </p>
+        )}
 
         <p style={{ margin: "8px 0" }}>{step.instruction}</p>
         {/* La habilidad tal como está en la ficha, por si hay dudas (si no hay texto de noche, ya es la instrucción). */}

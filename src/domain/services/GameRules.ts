@@ -112,6 +112,17 @@ export const setNightStep = (game: Game, step: number): Game => ({ ...game, nigh
 
 export const setBluffs = (game: Game, bluffs: string[]): Game => touch({ ...game, demonBluffs: bluffs.slice(0, 3) });
 
+/** El Narrador pone o quita una Fábula o un Lórico (y lo anuncia a la mesa). */
+export function toggleFabled(game: Game, character: Character): Game {
+  if (character.team !== "fabled" && character.team !== "loric") throw new RuleViolation(`${character.name} no es una Fábula ni un Lórico.`);
+  const current = game.fabledIds ?? [];
+  const on = current.includes(character.id);
+  return touch(
+    { ...game, fabledIds: on ? current.filter((id) => id !== character.id) : [...current, character.id] },
+    `${character.name} ${on ? "sale de" : "entra en"} juego.`,
+  );
+}
+
 // ---------- Nominaciones y votos ----------
 
 /** Votos necesarios: la mitad de los vivos, redondeando hacia arriba. */

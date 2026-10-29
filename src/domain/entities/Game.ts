@@ -53,6 +53,8 @@ export interface Game {
   /** Personajes del guion, para que los jugadores vean la lista aunque el guion sea personalizado. */
   scriptCharacterIds?: string[];
   players: Player[];
+  /** Fábulas y Lóricos en juego: los usa el Narrador, no son jugadores y toda la mesa los conoce. */
+  fabledIds?: string[];
   demonBluffs: string[];
   phase: Phase;
   /** Paso de la hoja de noche en el que va el Narrador. */

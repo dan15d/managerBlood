@@ -19,6 +19,7 @@ interface PublicRow {
   phase_label: string | null;
   winner: string | null;
   players: PublicPlayer[];
+  fabled_ids: string[] | null;
 }
 
 interface SeatRow {
@@ -184,9 +185,10 @@ export class SupabaseTablePublisher implements TablePublisher {
       phase_label: publicPhase(game),
       winner: game.winner ?? null,
       players: publicPlayers(game, characters),
+      fabled_ids: game.fabledIds ?? [],
     };
     const seats = game.players.map((p) => {
-      const secret = seatSecret(p, characters);
+      const secret = seatSecret(p, characters, game.fabledIds);
       return {
         id: p.id,
         game_id: game.id,
@@ -267,6 +269,7 @@ export class SupabasePlayerGateway implements PlayerGateway {
       alive: seat.alive,
       ghostVoteUsed: seat.ghost_vote_used,
       players: table.players ?? [],
+      fabledIds: table.fabled_ids ?? [],
     };
   }
 

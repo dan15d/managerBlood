@@ -10,6 +10,7 @@ Se puede instalar en el móvil desde el navegador («Añadir a pantalla de inici
 - Guiones oficiales (Trouble Brewing, Bad Moon Rising, Sects & Violets) y **guiones personalizados** (con importación/exportación del JSON de la herramienta oficial).
 - 181 personajes en español (nombres, habilidades, recordatorios y textos de noche de la [wiki de Villacuervos](https://villacuervos.es/wiki/)) con el **orden de noche oficial**.
 - Reparto según la hoja de preparación, con los personajes que la cambian (Barón, Padrino, Fang Gu, Vigormortis…), Borracho/Lunático/Marioneta y faroles del Demonio.
+- **Fábulas y Lóricos** al preparar y durante la partida (Centinela, Papa, Juguetero, Tor, Jardinero…), y las 131 **incompatibilidades** oficiales (jinxes) de la wiki: el Djinn entra solo si el guion las tiene, y se avisan en la preparación, el Grimorio y la IA. También se contemplan el Ateo, el Invocador, el Cazarrecompensas, el Tonto del pueblo y la Marioneta (junto al Demonio).
 - Grimorio circular, recordatorios, vivos/muertos, voto fantasma, nominaciones y umbral de ejecución.
 - «Repartir»: se pasa el móvil y cada jugador ve su personaje en secreto.
 

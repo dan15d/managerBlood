@@ -1,5 +1,6 @@
 import type { Character, Team } from "../entities/Character";
-import { TEAM_LABEL } from "../entities/Character";
+import { isGoodTeam, TEAM_LABEL, TEAMS_IN_BAG } from "../entities/Character";
+import { POPE } from "./SpecialRules";
 
 export interface Distribution {
   townsfolk: number;
@@ -71,6 +72,12 @@ export interface SetupModifier {
   outsiders?: number[];
   minions?: number[];
   requires?: string[];
+  /** Sin Demonio en la bolsa: su sitio lo ocupa un Aldeano (Invocador). */
+  noDemon?: boolean;
+  /** Sin Esbirros ni Demonio: todos sus sitios los ocupan Aldeanos (Ateo). */
+  noEvil?: boolean;
+  /** Cuántas fichas iguales puede haber en la bolsa (Tonto del pueblo). */
+  copies?: number;
   note: string;
 }
 
@@ -87,7 +94,23 @@ export const SETUP_MODIFIERS: Record<string, SetupModifier> = {
   lordoftyphon: { minions: [1], note: "+1 Esbirro" },
   huntsman: { requires: ["damsel"], note: "+la Damisela" },
   choirboy: { requires: ["king"], note: "+el Rey" },
+  atheist: { noEvil: true, note: "No hay malos" },
+  summoner: { noDemon: true, note: "No hay Demonio" },
+  villageidiot: { copies: 3, note: "+0 a +2 Tontos del pueblo" },
+  bountyhunter: { note: "1 Aldeano es malo" },
+  marionette: { note: "Junto al Demonio" },
 };
+
+/** Incompatibilidades que prohíben que dos personajes empiecen a la vez en juego. */
+export const INCOMPATIBLE: readonly [string, string][] = [
+  ["heretic", "baron"],
+  ["heretic", "godfather"],
+  ["heretic", "pithag"],
+  ["heretic", "spy"],
+  ["heretic", "widow"],
+  ["heretic", "lleech"],
+  ["legion", "engineer"],
+];
 
 /** Personajes que no saben quiénes son: se les enseña otra ficha. */
 export const DECOYS: Record<string, Team> = {
@@ -114,9 +137,15 @@ const countByTeam = (characters: Character[]): Distribution => {
 export function allowedDistributions(playerCount: number, characters: Character[]): Distribution[] {
   const base = baseDistribution(playerCount);
   let options: Distribution[] = [base];
-  for (const c of characters) {
-    const mod = SETUP_MODIFIERS[c.id];
-    if (!mod) continue;
+  const mods = [...new Set(characters.map((c) => c.id))].map((id) => SETUP_MODIFIERS[id]).filter(Boolean);
+  for (const mod of mods) {
+    if (mod.noEvil || mod.noDemon) {
+      options = options.map((d) => {
+        const removed = mod.noEvil ? d.minion + d.demon : d.demon;
+        return { ...d, townsfolk: d.townsfolk + removed, minion: mod.noEvil ? 0 : d.minion, demon: 0 };
+      });
+      continue;
+    }
     const next: Distribution[] = [];
     for (const d of options) {
       for (const o of mod.outsiders ?? [0]) {
@@ -137,12 +166,17 @@ export function allowedDistributions(playerCount: number, characters: Character[
 export const sameDistribution = (a: Distribution, b: Distribution) =>
   a.townsfolk === b.townsfolk && a.outsider === b.outsider && a.minion === b.minion && a.demon === b.demon;
 
-/** Comprueba una selección de personajes para la bolsa y explica qué falla. */
+/**
+ * Comprueba una selección de personajes para la bolsa y explica qué falla. Puede incluir las
+ * Fábulas y Lóricos en juego: no van a la bolsa, pero algunos cambian la preparación
+ * (el Centinela, un Forastero más o menos; el Papa, buenos repetidos).
+ */
 export function validateSelection(playerCount: number, characters: Character[]): SetupIssue[] {
   const issues: SetupIssue[] = [];
   const bagSize = Math.min(playerCount, MAX_BAG_PLAYERS);
-  const inBag = characters.filter((c) => c.team !== "traveller" && c.team !== "fabled");
+  const inBag = characters.filter((c) => TEAMS_IN_BAG.includes(c.team));
   const counts = countByTeam(inBag);
+  const ids = new Set(inBag.map((c) => c.id));
 
   if (inBag.length !== bagSize) {
     issues.push({
@@ -150,9 +184,10 @@ export function validateSelection(playerCount: number, characters: Character[]):
       message: `Hay ${inBag.length} personajes en la bolsa y deben ser ${bagSize}.`,
     });
   }
-  if (counts.demon < 1) issues.push({ level: "error", message: "Falta el Demonio." });
+  const withoutDemon = inBag.some((c) => SETUP_MODIFIERS[c.id]?.noDemon || SETUP_MODIFIERS[c.id]?.noEvil);
+  if (counts.demon < 1 && !withoutDemon) issues.push({ level: "error", message: "Falta el Demonio." });
 
-  const options = allowedDistributions(playerCount, inBag);
+  const options = allowedDistributions(playerCount, characters);
   if (inBag.length === bagSize && !options.some((d) => sameDistribution(d, counts))) {
     const expected = options
       .map((d) => `${d.townsfolk} ${TEAM_LABEL.townsfolk.plural}, ${d.outsider} ${TEAM_LABEL.outsider.plural}, ${d.minion} ${TEAM_LABEL.minion.plural}, ${d.demon} ${TEAM_LABEL.demon.singular}`)
@@ -160,15 +195,30 @@ export function validateSelection(playerCount: number, characters: Character[]):
     issues.push({ level: "error", message: `El reparto no cuadra. Se espera: ${expected}.` });
   }
 
-  const ids = new Set(inBag.map((c) => c.id));
-  for (const c of inBag) {
+  for (const c of inBag.filter((x, i) => inBag.indexOf(x) === i)) {
     const mod = SETUP_MODIFIERS[c.id];
     if (mod?.requires?.some((req) => !ids.has(req))) {
       issues.push({ level: "error", message: `${c.name} necesita ${mod.note.replace("+", "")} en la bolsa.` });
     }
   }
-  if (ids.size !== inBag.length) issues.push({ level: "error", message: "Hay personajes repetidos." });
-  if (playerCount < 7 && characters.some((c) => c.edition === "bmr" || c.edition === "snv")) {
+  // Con el Papa puede haber buenos repetidos; el Tonto del pueblo trae sus copias. El Mal nunca.
+  const pope = characters.some((c) => c.id === POPE);
+  for (const id of ids) {
+    const copies = inBag.filter((c) => c.id === id);
+    const allowed = SETUP_MODIFIERS[id]?.copies ?? (pope && isGoodTeam(copies[0].team) ? bagSize : 1);
+    if (copies.length > allowed) {
+      issues.push({
+        level: "error",
+        message: allowed > 1 ? `Puede haber hasta ${allowed} ${copies[0].name}.` : `${copies[0].name} está repetido.${pope ? " Solo los buenos pueden repetirse." : ""}`,
+      });
+    }
+  }
+  for (const [a, b] of INCOMPATIBLE) {
+    const first = inBag.find((c) => c.id === a);
+    const second = inBag.find((c) => c.id === b);
+    if (first && second) issues.push({ level: "error", message: `${first.name} y ${second.name} no pueden estar los dos en juego.` });
+  }
+  if (playerCount < 7 && inBag.some((c) => c.edition === "bmr" || c.edition === "snv")) {
     issues.push({
       level: "warning",
       message: "Con menos de 7 jugadores, Bad Moon Rising y Sects & Violets pueden quedar desequilibrados.",
@@ -180,7 +230,7 @@ export function validateSelection(playerCount: number, characters: Character[]):
 /** Lo que se espera para cada equipo con lo que ya se ha elegido (para los contadores de la UI). */
 export function targetDistribution(playerCount: number, characters: Character[]): Distribution {
   const options = allowedDistributions(playerCount, characters);
-  const counts = countByTeam(characters);
+  const counts = countByTeam(characters.filter((c) => TEAMS_IN_BAG.includes(c.team)));
   return options.find((d) => sameDistribution(d, counts)) ?? options[0];
 }
 

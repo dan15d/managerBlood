@@ -41,3 +41,12 @@ export const defaultAlignment = (team: Team): Alignment =>
   team === "minion" || team === "demon" ? "evil" : "good";
 
 export const isGoodTeam = (team: Team) => team === "townsfolk" || team === "outsider";
+
+/** Fábulas y Lóricos: personajes del Narrador. No son jugadores ni salen de la bolsa. */
+export const isStorytellerTeam = (team: Team) => team === "fabled" || team === "loric";
+
+/** Incompatibilidad oficial (jinx): regla especial cuando dos personajes están en juego a la vez. */
+export interface Jinx {
+  characterIds: [string, string];
+  text: string;
+}

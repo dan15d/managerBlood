@@ -4,7 +4,8 @@ import type { Game, Player } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { buildNightOrder } from "@domain/services/NightOrder";
 import { seededRandom } from "@domain/services/Random";
-import { pickBluffs, pickDecoys, randomSelection } from "@domain/services/SetupGenerator";
+import { applySetupEffects, pickBluffs, pickDecoys, randomSelection, seatMarionette } from "@domain/services/SetupGenerator";
+import { defaultFabled, jinxesAmong } from "@domain/services/SpecialRules";
 import { publicPlayers, seatSecret } from "@domain/services/TableView";
 import { allowedDistributions, baseDistribution, maxTravellers, travellerSeats, validateSelection } from "@domain/services/SetupRules";
 
@@ -205,5 +206,103 @@ describe("Viajeros", () => {
     const players = publicPlayers(g, catalog.map());
     expect(players[5].travellerId).toBe("thief");
     expect(players.slice(0, 5).every((p) => p.travellerId === undefined)).toBe(true);
+  });
+});
+
+describe("Fábulas, Lóricos y casos especiales", () => {
+  const tb7 = ["washerwoman", "librarian", "investigator", "chef", "empath", "poisoner", "imp"];
+
+  it("el Centinela permite un Forastero más o menos", () => {
+    const withOutsider = chars(["washerwoman", "librarian", "investigator", "chef", "butler", "poisoner", "imp"]);
+    expect(validateSelection(7, withOutsider).some((i) => i.level === "error")).toBe(true);
+    expect(validateSelection(7, [...withOutsider, ...chars(["sentinel"])])).toEqual([]);
+  });
+
+  it("con el Papa se repiten buenos, pero nunca malos", () => {
+    const twoChefs = chars(["chef", "chef", "investigator", "empath", "washerwoman", "poisoner", "imp"]);
+    expect(validateSelection(7, twoChefs).some((i) => i.level === "error")).toBe(true);
+    expect(validateSelection(7, [...twoChefs, ...chars(["pope"])])).toEqual([]);
+    const twoImps = chars(["chef", "investigator", "empath", "washerwoman", "librarian", "imp", "imp"]);
+    expect(validateSelection(7, [...twoImps, ...chars(["pope"])]).some((i) => i.level === "error")).toBe(true);
+  });
+
+  it("hasta 3 Tontos del pueblo sin Papa", () => {
+    const idiots = chars(["villageidiot", "villageidiot", "villageidiot", "chef", "empath", "poisoner", "imp"]);
+    expect(validateSelection(7, idiots)).toEqual([]);
+  });
+
+  it("el Hereje no puede estar con el Barón (incompatibilidad)", () => {
+    const bag = chars(["heretic", "butler", "chef", "empath", "investigator", "baron", "imp"]);
+    expect(validateSelection(7, bag).map((i) => i.message).join(" ")).toContain("no pueden estar los dos");
+  });
+
+  it("con el Ateo no hay malos; con el Invocador no hay Demonio", () => {
+    const atheist = chars(["atheist", "chef", "empath", "investigator", "washerwoman", "librarian", "monk"]);
+    expect(validateSelection(7, atheist)).toEqual([]);
+    const summoner = chars(["chef", "empath", "investigator", "washerwoman", "librarian", "monk", "summoner"]);
+    expect(validateSelection(7, summoner)).toEqual([]);
+  });
+
+  it("el Juguetero da información al Mal con menos de 7; Tor la quita", () => {
+    const five = ["chef", "empath", "investigator", "poisoner", "imp"];
+    const kinds = (g: Game) => buildNightOrder(g, catalog.map()).map((s) => s.kind);
+    const night1 = { phase: { kind: "night", number: 1 } } as const;
+    expect(kinds(game(five, night1))).not.toContain("minion_info");
+    expect(kinds(game(five, { ...night1, fabledIds: ["toymaker"] }))).toContain("minion_info");
+    expect(kinds(game(tb7, { ...night1, fabledIds: ["tor"] }))).not.toContain("demon_info");
+  });
+
+  it("las Fábulas con paso de noche salen en la hoja sin jugadores y sin marcarse muertas", () => {
+    const steps = buildNightOrder(game(tb7, { phase: { kind: "night", number: 1 }, fabledIds: ["angel"] }), catalog.map());
+    const angel = steps.find((s) => s.key === "char:angel")!;
+    expect(angel.playerIds).toEqual([]);
+    expect(angel.dead).toBe(false);
+  });
+
+  it("con Tor los vivos no ven su personaje", () => {
+    const g = game(tb7, { fabledIds: ["tor"] });
+    expect(seatSecret(g.players[0], catalog.map(), g.fabledIds)).toEqual({});
+    expect(seatSecret({ ...g.players[0], alive: false }, catalog.map(), g.fabledIds).characterId).toBe("washerwoman");
+  });
+
+  it("el Djinn entra si el guion tiene incompatibilidades", () => {
+    const jinxes = catalog.jinxes();
+    expect(defaultFabled(chars(["chef", "imp", "sentinel"]), jinxes)).toEqual(["sentinel"]);
+    expect(defaultFabled(chars(["heretic", "baron", "imp"]), jinxes)).toEqual(["djinn"]);
+    expect(jinxesAmong(["spy", "magician", "chef"], jinxes)).toHaveLength(1);
+  });
+
+  it("se ponen y quitan Fábulas durante la partida, pero no otros personajes", () => {
+    let g = rules.toggleFabled(game(tb7), catalog.get("ferryman")!);
+    expect(g.fabledIds).toEqual(["ferryman"]);
+    g = rules.toggleFabled(g, catalog.get("ferryman")!);
+    expect(g.fabledIds).toEqual([]);
+    expect(() => rules.toggleFabled(g, catalog.get("chef")!)).toThrow();
+  });
+
+  it("la Marioneta se sienta junto al Demonio", () => {
+    const g = game(["marionette", "chef", "empath", "imp", "investigator", "washerwoman", "librarian"]);
+    const players = seatMarionette(g.players, catalog.map(), seededRandom(5));
+    const m = players.find((p) => p.characterId === "marionette")!;
+    expect([2, 4]).toContain(m.seat);
+    expect(players.filter((p) => p.characterId === "marionette")).toHaveLength(1);
+  });
+
+  it("el Cazarrecompensas vuelve malo a un Aldeano; un Tonto del pueblo extra está borracho", () => {
+    const g = game(["bountyhunter", "chef", "villageidiot", "villageidiot", "empath", "poisoner", "imp"]);
+    let n = 0;
+    const { players, log } = applySetupEffects(g.players, catalog.map(), seededRandom(9), () => `r${n++}`);
+    const evilTownsfolk = players.filter((p) => p.alignment === "evil" && catalog.get(p.characterId)!.team === "townsfolk");
+    expect(evilTownsfolk).toHaveLength(1);
+    expect(evilTownsfolk[0].characterId).not.toBe("bountyhunter");
+    expect(players.filter((p) => p.reminders.some((r) => r.label === "Borracho"))).toHaveLength(1);
+    expect(log).toHaveLength(2);
+  });
+
+  it("la Marioneta no cree ser el Rey si está el Niño del coro", () => {
+    const pool = chars(["king", "chef"]);
+    for (let seed = 0; seed < 10; seed++) {
+      expect(pickDecoys(chars(["marionette", "choirboy"]), pool, seededRandom(seed)).marionette).toBe("chef");
+    }
   });
 });

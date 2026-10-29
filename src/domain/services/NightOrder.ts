@@ -1,5 +1,6 @@
 import type { Character } from "../entities/Character";
 import type { Game, Player } from "../entities/Game";
+import { TOR, TOYMAKER } from "./SpecialRules";
 
 export type NightStepKind = "dusk" | "minion_info" | "demon_info" | "character" | "dawn";
 
@@ -24,8 +25,12 @@ export interface NightStep {
 export const FIRST_NIGHT_MINION_INFO = 20;
 export const FIRST_NIGHT_DEMON_INFO = 24;
 
-/** Con menos de 7 jugadores los Esbirros y el Demonio no se conocen la primera noche. */
-export const hasEvilInfo = (playerCount: number) => playerCount >= 7;
+/**
+ * Con menos de 7 jugadores los Esbirros y el Demonio no se conocen la primera noche, salvo con
+ * el Juguetero. Con Tor nadie conoce su personaje, así que tampoco hay información del Mal.
+ */
+export const hasEvilInfo = (playerCount: number, fabledIds: string[] = []) =>
+  !fabledIds.includes(TOR) && (playerCount >= 7 || fabledIds.includes(TOYMAKER));
 
 const nightNumber = (game: Game) => (game.phase.kind === "night" ? game.phase.number : game.phase.number + 1);
 
@@ -46,7 +51,7 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
     },
   });
 
-  if (first && hasEvilInfo(seated)) {
+  if (first && hasEvilInfo(seated, game.fabledIds)) {
     const minions = game.players.filter((p) => team(p) === "minion");
     const demons = game.players.filter((p) => team(p) === "demon");
     steps.push({
@@ -79,6 +84,8 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
     add(p.characterId, p);
     if (p.shownCharacterId) add(p.shownCharacterId, p);
   }
+  // Las Fábulas y Lóricos no son jugadores: su paso lo hace el Narrador (anunciar, poner recordatorios…).
+  for (const id of game.fabledIds ?? []) if (!byCharacter.has(id)) byCharacter.set(id, []);
   for (const [id, players] of byCharacter) {
     const c = characters.get(id);
     if (!c) continue;
@@ -95,7 +102,7 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
         playerIds: players.map((p) => p.id),
         deceivedPlayerIds: deceived,
         character: c,
-        dead: players.every((p) => !p.alive),
+        dead: players.length > 0 && players.every((p) => !p.alive),
       },
     });
   }

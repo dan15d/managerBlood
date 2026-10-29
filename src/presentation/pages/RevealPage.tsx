@@ -1,5 +1,6 @@
 import type { Game, Player } from "@domain/entities/Game";
 import { TEAM_LABEL } from "@domain/entities/Character";
+import { hasFabled, TOR } from "@domain/services/SpecialRules";
 import { seatSecret } from "@domain/services/TableView";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -26,7 +27,8 @@ export function RevealPage() {
   if (!game) return <main className="page page--flow muted">Cargando…</main>;
 
   if (current) {
-    const secret = seatSecret(current, app.catalog.map());
+    const secret = seatSecret(current, app.catalog.map(), game.fabledIds);
+    const tor = hasFabled(game, TOR) && current.alive;
     const character = secret.characterId ? app.catalog.get(secret.characterId) : undefined;
     const done = () => {
       setSeen((s) => [...new Set([...s, current.id])]);
@@ -52,7 +54,11 @@ export function RevealPage() {
             <>
               <p className="muted">{current.name}, eres…</p>
               <Token character={character} alignment={secret.alignment} size={200} />
-              {!character && <p className="muted">El Narrador todavía no te ha asignado personaje.</p>}
+              {!character && (
+                <p className="muted">
+                  {tor ? "Con Tor nadie conoce su personaje ni su bando: lo descubrirás al morir." : "El Narrador todavía no te ha asignado personaje."}
+                </p>
+              )}
               <h1 className={character ? `team-${character.team}` : undefined} style={{ margin: 0 }}>
                 {character?.name}
               </h1>

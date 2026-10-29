@@ -1,11 +1,13 @@
 import { scriptCharacters } from "@application/use-cases/SetupUseCases";
 import type { Character } from "@domain/entities/Character";
 import { FIRST_NIGHT_DEMON_INFO, FIRST_NIGHT_MINION_INFO } from "@domain/services/NightOrder";
+import { jinxesAmong } from "@domain/services/SpecialRules";
 import { ArrowLeft, Copy, Moon, Pencil, Play, ScrollText, Sunrise } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useApp } from "../app/AppContext";
 import { EditionBanner } from "../components/EditionBanner";
+import { JinxList } from "../components/JinxList";
 import { ScriptCharacterList } from "../components/ScriptCharacterList";
 import { Token } from "../components/Token";
 import { useAsync } from "../hooks/useAsync";
@@ -58,6 +60,7 @@ export function ScriptViewPage() {
   const scripts = useAsync(() => app.listScripts.execute(), [app]);
   const script = scripts.data?.find((s) => s.id === id);
   const characters = useMemo(() => (script ? scriptCharacters(app.catalog, script) : []), [app, script]);
+  const jinxes = useMemo(() => jinxesAmong(script?.characterIds ?? [], app.catalog.jinxes()), [app, script]);
 
   if (scripts.loading) return <main className="page page--flow muted">Cargando…</main>;
   if (!script) {
@@ -132,7 +135,21 @@ export function ScriptViewPage() {
       </div>
 
       {tab === "characters" ? (
-        <ScriptCharacterList characters={characters} />
+        <>
+          <ScriptCharacterList characters={characters} />
+          {jinxes.length > 0 && (
+            <section className="team-section">
+              <div className="team-section__head">
+                <h3 className="team-fabled">Incompatibilidades</h3>
+                <span className="counter">{jinxes.length}</span>
+              </div>
+              <p className="muted small" style={{ marginTop: 0 }}>
+                Reglas especiales cuando estos personajes están juntos. Al jugar, el Djinn las anuncia a la mesa.
+              </p>
+              <JinxList jinxes={jinxes} characters={app.catalog.map()} />
+            </section>
+          )}
+        </>
       ) : (
         <ol className="night-sheet">
           {nightSheet(characters, tab === "first").map((row) => (

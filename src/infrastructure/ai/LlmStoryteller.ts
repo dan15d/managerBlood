@@ -131,7 +131,7 @@ Responde SOLO con un objeto JSON: {"name": "nombre evocador en español", "descr
     };
   }
 
-  async advise({ game, characters, question }: AiAdviceRequest): Promise<string> {
+  async advise({ game, characters, jinxes, question }: AiAdviceRequest): Promise<string> {
     const name = (id?: string) => (id ? (characters.get(id)?.name ?? id) : "");
     const grimoire = game.players
       .map((p) => {
@@ -154,6 +154,8 @@ Responde SOLO con un objeto JSON: {"name": "nombre evocador en español", "descr
 Grimorio (en orden de asiento, en sentido horario):
 ${grimoire}
 Faroles del Demonio: ${game.demonBluffs.map(name).join(", ") || "ninguno"}
+Fábulas y Lóricos en juego: ${(game.fabledIds ?? []).map((id) => `${name(id)} (${characters.get(id)?.ability ?? ""})`).join("; ") || "ninguno"}
+Incompatibilidades (jinxes) en juego: ${jinxes.map((j) => `${name(j.characterIds[0])} + ${name(j.characterIds[1])}: ${j.text}`).join(" | ") || "ninguna"}
 Últimos sucesos:
 ${recent}`;
 

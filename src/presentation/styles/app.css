@@ -809,6 +809,65 @@ button.token {
   color: var(--fabled);
 }
 
+/* Personaje que puede ir repetido (Papa, Tonto del pueblo): «+1» en la esquina. */
+.pick-wrap {
+  position: relative;
+  display: grid;
+}
+
+.pick-wrap .pick {
+  padding-bottom: 40px;
+}
+
+.pick__more {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+/* Fábulas y Lóricos en juego, bajo el Grimorio. */
+.fabled-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.fabled-row__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 76px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.72rem;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.jinx {
+  border-left: 3px solid var(--fabled);
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.jinx__pair {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--fabled);
+  font-size: 0.78rem;
+}
+
 .distribution {
   display: flex;
   flex-wrap: wrap;

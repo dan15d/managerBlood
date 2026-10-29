@@ -51,4 +51,6 @@ export interface PlayerView {
   alive: boolean;
   ghostVoteUsed: boolean;
   players: PublicPlayer[];
+  /** Fábulas y Lóricos en juego: el Narrador los anuncia a toda la mesa. */
+  fabledIds: string[];
 }

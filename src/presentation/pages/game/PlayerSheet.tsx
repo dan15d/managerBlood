@@ -1,5 +1,7 @@
-import type { Character } from "@domain/entities/Character";
+import type { Character, Jinx } from "@domain/entities/Character";
 import { TEAM_LABEL } from "@domain/entities/Character";
+import { gameCharacterIds, jinxesOf } from "@domain/services/SpecialRules";
+import { JinxList } from "../../components/JinxList";
 import type { Game, Player } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { DECOYS } from "@domain/services/SetupRules";
@@ -20,13 +22,15 @@ interface Props {
   player: Player;
   characters: Map<string, Character>;
   scriptCharacters: Character[];
+  /** Incompatibilidades oficiales: se avisan las de su personaje con los demás en juego. */
+  jinxes: Jinx[];
   newId: () => string;
   onChange: (mutate: (g: Game) => Game) => void;
   onClose: () => void;
 }
 
 /** Todo lo de un jugador en una hoja: lo que más se usa arriba, lo raro al final. */
-export function PlayerSheet({ game, player, characters, scriptCharacters, newId, onChange, onClose }: Props) {
+export function PlayerSheet({ game, player, characters, scriptCharacters, jinxes, newId, onChange, onClose }: Props) {
   const [changing, setChanging] = useState(false);
   const [custom, setCustom] = useState("");
   const [card, setCard] = useState<{ heading: string; characters: Character[] } | null>(null);
@@ -39,7 +43,7 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
   // Borracho, Lunático y Marioneta: qué tipo de personaje creen ser.
   const decoyTeam = DECOYS[player.characterId];
 
-  const inPlay = [...new Set(game.players.flatMap((p) => [p.characterId, p.shownCharacterId].filter(Boolean) as string[]))]
+  const inPlay = [...new Set([...game.players.flatMap((p) => [p.characterId, p.shownCharacterId].filter(Boolean) as string[]), ...(game.fabledIds ?? [])])]
     .map((id) => characters.get(id))
     .filter((c): c is Character => !!c && c.reminders.length > 0)
     .sort((a, b) => TEAM_ORDER.indexOf(a.team) - TEAM_ORDER.indexOf(b.team));
@@ -90,6 +94,7 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
             </div>
           </div>
           {character && <p className="ability">{character.ability}</p>}
+          <JinxList jinxes={jinxesOf(player.characterId, gameCharacterIds(game), jinxes)} characters={characters} />
           {shown && (
             <div className="alert alert--warning small">
               <VenetianMask /> Cree ser <strong>{shown.name}</strong>. Despiértalo como tal y dale información falsa si te conviene.

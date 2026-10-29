@@ -4,16 +4,19 @@ import type { Game, Player } from "../entities/Game";
 import type { PublicPlayer } from "../entities/Table";
 import { phaseLabel } from "./GameRules";
 import { DECOYS } from "./SetupRules";
+import { TOR } from "./SpecialRules";
 
 /**
  * Lo que se enseña a cada jugador de sí mismo: el personaje que cree ser y su bando aparente.
  * El Borracho, el Lunático y la Marioneta nunca ven su personaje real: si aún no tienen uno
- * falso asignado, no se les enseña nada.
+ * falso asignado, no se les enseña nada. Con Tor nadie sabe quién es hasta que muere.
  */
 export function seatSecret(
   player: Player,
   characters: Map<string, Character>,
+  fabledIds: string[] = [],
 ): { characterId?: string; alignment?: Alignment } {
+  if (fabledIds.includes(TOR) && player.alive) return {};
   const shown = player.shownCharacterId && characters.get(player.shownCharacterId);
   if (shown) return { characterId: shown.id, alignment: defaultAlignment(shown.team) };
   if (DECOYS[player.characterId]) return {};
