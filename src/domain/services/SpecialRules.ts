@@ -1,4 +1,4 @@
-import type { Character, Jinx } from "../entities/Character";
+import type { Character, CharacterPair, Jinx } from "../entities/Character";
 import type { Game } from "../entities/Game";
 
 // Fábulas, Lóricos e incompatibilidades (jinxes): lo que cambia la preparación o la noche.
@@ -15,15 +15,15 @@ export const POPE = "pope";
 /** El Narrador puede asignar personajes a jugadores concretos. */
 export const GARDENER = "gardener";
 
-/** Incompatibilidades cuyos dos personajes están entre los dados. */
-export function jinxesAmong(characterIds: Iterable<string>, jinxes: Jinx[]): Jinx[] {
+/** Incompatibilidades (o interacciones) cuyos dos personajes están entre los dados. */
+export function jinxesAmong<T extends CharacterPair>(characterIds: Iterable<string>, pairs: T[]): T[] {
   const ids = new Set(characterIds);
-  return jinxes.filter((j) => ids.has(j.characterIds[0]) && ids.has(j.characterIds[1]));
+  return pairs.filter((j) => ids.has(j.characterIds[0]) && ids.has(j.characterIds[1]));
 }
 
-/** Incompatibilidades de un personaje con los demás dados. */
-export const jinxesOf = (characterId: string, others: Iterable<string>, jinxes: Jinx[]) =>
-  jinxesAmong([characterId, ...others], jinxes).filter((j) => j.characterIds.includes(characterId));
+/** Incompatibilidades (o interacciones) de un personaje con los demás dados. */
+export const jinxesOf = <T extends CharacterPair>(characterId: string, others: Iterable<string>, pairs: T[]): T[] =>
+  jinxesAmong([characterId, ...others], pairs).filter((j) => j.characterIds.includes(characterId));
 
 /**
  * Fábulas y Lóricos con los que empieza una partida de este guion: los que trae el guion

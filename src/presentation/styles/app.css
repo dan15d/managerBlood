@@ -860,6 +860,68 @@ button.token {
   font-size: 0.85rem;
 }
 
+/* Guía de la wiki: apartados plegables. */
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.guide__section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.guide__section > summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.guide__section > summary .lucide {
+  width: 16px;
+  height: 16px;
+  color: var(--fabled);
+}
+
+.guide__body {
+  padding: 0 12px 10px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.guide__body p,
+.guide__body ul {
+  margin: 0 0 8px;
+}
+
+.guide__body ul {
+  padding-left: 20px;
+}
+
+.guide__body blockquote {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--line-strong);
+  color: var(--muted);
+  font-style: italic;
+}
+
+.guide__quote {
+  margin: 4px 0 0;
+  font-style: italic;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .jinx__pair {
   display: block;
   font-family: var(--font-display);

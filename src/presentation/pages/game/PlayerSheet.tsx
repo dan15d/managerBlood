@@ -1,7 +1,7 @@
-import type { Character, Jinx } from "@domain/entities/Character";
+import type { Character } from "@domain/entities/Character";
 import { TEAM_LABEL } from "@domain/entities/Character";
-import { gameCharacterIds, jinxesOf } from "@domain/services/SpecialRules";
-import { JinxList } from "../../components/JinxList";
+import { gameCharacterIds } from "@domain/services/SpecialRules";
+import { CharacterGuide, SpecialCases } from "../../components/CharacterGuide";
 import type { Game, Player } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { DECOYS } from "@domain/services/SetupRules";
@@ -22,15 +22,13 @@ interface Props {
   player: Player;
   characters: Map<string, Character>;
   scriptCharacters: Character[];
-  /** Incompatibilidades oficiales: se avisan las de su personaje con los demás en juego. */
-  jinxes: Jinx[];
   newId: () => string;
   onChange: (mutate: (g: Game) => Game) => void;
   onClose: () => void;
 }
 
 /** Todo lo de un jugador en una hoja: lo que más se usa arriba, lo raro al final. */
-export function PlayerSheet({ game, player, characters, scriptCharacters, jinxes, newId, onChange, onClose }: Props) {
+export function PlayerSheet({ game, player, characters, scriptCharacters, newId, onChange, onClose }: Props) {
   const [changing, setChanging] = useState(false);
   const [custom, setCustom] = useState("");
   const [card, setCard] = useState<{ heading: string; characters: Character[] } | null>(null);
@@ -94,7 +92,7 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, jinxes
             </div>
           </div>
           {character && <p className="ability">{character.ability}</p>}
-          <JinxList jinxes={jinxesOf(player.characterId, gameCharacterIds(game), jinxes)} characters={characters} />
+          <SpecialCases characterId={player.characterId} inPlayIds={gameCharacterIds(game)} />
           {shown && (
             <div className="alert alert--warning small">
               <VenetianMask /> Cree ser <strong>{shown.name}</strong>. Despiértalo como tal y dale información falsa si te conviene.
@@ -228,6 +226,13 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, jinxes
             placeholder="Qué dice ser, a quién ha señalado…"
             onBlur={(e) => e.target.value !== (player.notes ?? "") && onChange((g) => rules.setNotes(g, player.id, e.target.value))}
           />
+
+          {character && (
+            <>
+              <div className="section-title">Guía de {character.name}</div>
+              <CharacterGuide characterId={character.id} audience="storyteller" />
+            </>
+          )}
 
           <details className="more">
             <summary>Más opciones</summary>

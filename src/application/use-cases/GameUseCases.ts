@@ -9,6 +9,7 @@ import { gameCharacterIds, jinxesAmong } from "@domain/services/SpecialRules";
 import { validateSelection } from "@domain/services/SetupRules";
 import type { AiStoryteller } from "../ports/AiStoryteller";
 import type { CharacterCatalog } from "../ports/CharacterCatalog";
+import type { CharacterGuideSource } from "../ports/CharacterGuides";
 import type { GameRepository, GameSummary } from "../ports/GameRepository";
 import type { IdGenerator } from "../ports/IdGenerator";
 import type { TablePublisher } from "../ports/TableGateway";
@@ -176,12 +177,16 @@ export class AskAiAdvice {
   constructor(
     private readonly ai: AiStoryteller,
     private readonly catalog: CharacterCatalog,
+    private readonly guides: CharacterGuideSource,
   ) {}
 
-  execute(game: Game, question: string): Promise<string> {
+  async execute(game: Game, question: string): Promise<string> {
     if (!question.trim()) throw new Error("Escribe la pregunta.");
-    const jinxes = jinxesAmong(gameCharacterIds(game), this.catalog.jinxes());
-    return this.ai.advise({ game, characters: this.catalog.map(), jinxes, question: question.trim() });
+    const inPlay = gameCharacterIds(game);
+    const jinxes = jinxesAmong(inPlay, this.catalog.jinxes());
+    // Si no cargan las interacciones (sin conexión), se pregunta igual sin ellas.
+    const interactions = await this.guides.interactions().then((list) => jinxesAmong(inPlay, list), () => []);
+    return this.ai.advise({ game, characters: this.catalog.map(), jinxes, interactions, question: question.trim() });
   }
 }
 

@@ -4,6 +4,7 @@ import type { Game } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { DJINN, gameCharacterIds, jinxesAmong } from "@domain/services/SpecialRules";
 import { useState } from "react";
+import { CharacterGuide, SpecialCases } from "../../components/CharacterGuide";
 import { CharacterPicker } from "../../components/CharacterPicker";
 import { JinxList } from "../../components/JinxList";
 import { Sheet } from "../../components/Sheet";
@@ -105,6 +106,8 @@ export function FabledBar({ game, characters, jinxes, onChange, onPickReminder }
               )}
             </div>
           )}
+          <SpecialCases characterId={open.id} inPlayIds={gameCharacterIds(game)} />
+          <CharacterGuide characterId={open.id} audience="storyteller" />
           <div className="row" style={{ marginTop: 16 }}>
             <button className="btn" onClick={() => setShowing(true)}>
               <Eye /> Enseñar

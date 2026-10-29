@@ -136,7 +136,7 @@ export function ScriptViewPage() {
 
       {tab === "characters" ? (
         <>
-          <ScriptCharacterList characters={characters} />
+          <ScriptCharacterList characters={characters} audience="storyteller" />
           {jinxes.length > 0 && (
             <section className="team-section">
               <div className="team-section__head">

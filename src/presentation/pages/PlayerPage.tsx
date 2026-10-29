@@ -5,6 +5,7 @@ import { TOR } from "@domain/services/SpecialRules";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
+import { CharacterGuide } from "../components/CharacterGuide";
 import { ScriptCharacterList } from "../components/ScriptCharacterList";
 import { Confirm } from "../components/Sheet";
 import { SeatCircle } from "../components/SeatCircle";
@@ -149,6 +150,10 @@ export function PlayerPage() {
                 <p className="ability" style={{ textAlign: "left", maxWidth: 480 }}>
                   {character.ability}
                 </p>
+                {/* La guía del personaje que cree ser (el Borracho ve la de su Aldeano), sin nada de la partida. */}
+                <div style={{ width: "100%", maxWidth: 480, textAlign: "left" }}>
+                  <CharacterGuide key={character.id} characterId={character.id} audience="player" />
+                </div>
                 <button className="btn btn--ghost" onClick={() => setRevealed(false)}>
                   <EyeOff /> Ocultar
                 </button>
@@ -171,10 +176,10 @@ export function PlayerPage() {
           {fabled.length > 0 && (
             <div className="card" style={{ marginBottom: 16 }}>
               <h2 style={{ margin: 0 }}>Anunciados por el Narrador</h2>
-              <ScriptCharacterList characters={fabled} />
+              <ScriptCharacterList characters={fabled} audience="player" />
             </div>
           )}
-          <ScriptCharacterList characters={script} />
+          <ScriptCharacterList characters={script} audience="player" />
         </>
       )}
 

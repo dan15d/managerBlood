@@ -4,6 +4,8 @@ import type { Game } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import type { NightStep } from "@domain/services/NightOrder";
 import { useState } from "react";
+import { gameCharacterIds } from "@domain/services/SpecialRules";
+import { CharacterGuide, SpecialCases } from "../../components/CharacterGuide";
 import { CharacterPicker } from "../../components/CharacterPicker";
 import { Sheet } from "../../components/Sheet";
 import { INFO_HEADINGS, ShowCard } from "../../components/ShowCard";
@@ -119,6 +121,16 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
             <span className="small muted">Habilidad · </span>
             {step.character.ability}
           </p>
+        )}
+
+        {step.character && <SpecialCases key={step.key} characterId={step.character.id} inPlayIds={gameCharacterIds(game)} />}
+        {step.character && (
+          <details className="guide__section" key={`guide:${step.key}`} style={{ marginTop: 6 }}>
+            <summary>Guía de {step.character.name}</summary>
+            <div className="guide__body">
+              <CharacterGuide characterId={step.character.id} audience="storyteller" />
+            </div>
+          </details>
         )}
 
         {step.character && step.character.reminders.length > 0 && (

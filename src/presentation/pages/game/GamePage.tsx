@@ -304,7 +304,6 @@ export function GamePage() {
           player={player}
           characters={characters}
           scriptCharacters={scriptCharacters}
-          jinxes={app.catalog.jinxes()}
           newId={app.newId}
           onChange={change}
           onClose={() => setSelected(null)}

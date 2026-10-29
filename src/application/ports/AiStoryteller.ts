@@ -1,4 +1,4 @@
-import type { Character, Jinx } from "@domain/entities/Character";
+import type { Character, Interaction, Jinx } from "@domain/entities/Character";
 import type { Game } from "@domain/entities/Game";
 import type { Distribution } from "@domain/services/SetupRules";
 
@@ -32,6 +32,8 @@ export interface AiAdviceRequest {
   characters: Map<string, Character>;
   /** Incompatibilidades entre los personajes en juego. */
   jinxes: Jinx[];
+  /** Interacciones de la wiki entre los personajes en juego. */
+  interactions: Interaction[];
   question: string;
 }
 

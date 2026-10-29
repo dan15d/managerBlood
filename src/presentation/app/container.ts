@@ -4,9 +4,11 @@ import { DeleteCustomScript, ListScripts, ParseScriptJson, SaveCustomScript } fr
 import { CompleteManualSetup, GenerateAiSetup, SuggestRandomSetup } from "@application/use-cases/SetupUseCases";
 import { AdminSession, ManageLobby, PlayerTable } from "@application/use-cases/TableUseCases";
 import { GenerateAiScript } from "@application/use-cases/AiScriptUseCases";
+import { ListSpecialCases, ReadCharacterGuide } from "@application/use-cases/GuideUseCases";
 import { BrowserOpenRouterTransport, SupabaseFunctionTransport, type ChatTransport } from "@infrastructure/ai/ChatTransport";
 import { LlmStoryteller } from "@infrastructure/ai/LlmStoryteller";
 import { StaticCharacterCatalog, StaticOfficialScripts } from "@infrastructure/catalog/StaticCatalog";
+import { StaticCharacterGuides } from "@infrastructure/catalog/StaticGuides";
 import { CryptoIdGenerator, env, hasSupabase, LocalSettingsStore } from "@infrastructure/config/BrowserServices";
 import {
   LocalAdminAuth,
@@ -36,6 +38,7 @@ function transportFor(settings: AppSettings): ChatTransport | null {
 
 export function buildContainer(settings: AppSettings) {
   const catalog = new StaticCharacterCatalog();
+  const guides = new StaticCharacterGuides();
   const ids = new CryptoIdGenerator();
   const random = Math.random;
   const games = supabase ? new SupabaseGameRepository(supabase) : new LocalStorageGameRepository();
@@ -60,7 +63,9 @@ export function buildContainer(settings: AppSettings) {
     loadGame: new LoadGame(games),
     saveGame: new SaveGame(games, publisher, catalog),
     deleteGame: new DeleteGame(games, publisher),
-    askAi: new AskAiAdvice(ai, catalog),
+    askAi: new AskAiAdvice(ai, catalog, guides),
+    readGuide: new ReadCharacterGuide(catalog, guides),
+    listSpecialCases: new ListSpecialCases(catalog, guides),
     testAi: new TestAiConnection(ai),
     newId: () => ids.uuid(),
     admin: new AdminSession(supabase ? new SupabaseAdminAuth(supabase) : new LocalAdminAuth()),

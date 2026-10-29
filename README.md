@@ -11,6 +11,7 @@ Se puede instalar en el móvil desde el navegador («Añadir a pantalla de inici
 - 181 personajes en español (nombres, habilidades, recordatorios y textos de noche de la [wiki de Villacuervos](https://villacuervos.es/wiki/)) con el **orden de noche oficial**.
 - Reparto según la hoja de preparación, con los personajes que la cambian (Barón, Padrino, Fang Gu, Vigormortis…), Borracho/Lunático/Marioneta y faroles del Demonio.
 - **Fábulas y Lóricos** al preparar y durante la partida (Centinela, Papa, Juguetero, Tor, Jardinero…), y las 131 **incompatibilidades** oficiales (jinxes) de la wiki: el Djinn entra solo si el guion las tiene, y se avisan en la preparación, el Grimorio y la IA. También se contemplan el Ateo, el Invocador, el Cazarrecompensas, el Tonto del pueblo y la Marioneta (junto al Demonio).
+- **Guía de cada personaje** de la wiki, distinta según quién la lea. El Narrador ve el resumen, cómo narrarlo, ejemplos y detalles de reglas, más los casos especiales (incompatibilidades e interacciones) con lo que hay en juego. El jugador ve el resumen, ejemplos, consejos y cómo farolear del personaje que cree ser, y nunca nada que dependa de la partida. Cada guía se descarga al abrirla.
 - Grimorio circular, recordatorios, vivos/muertos, voto fantasma, nominaciones y umbral de ejecución.
 - «Repartir»: se pasa el móvil y cada jugador ve su personaje en secreto.
 

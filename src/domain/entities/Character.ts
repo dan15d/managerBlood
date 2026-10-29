@@ -45,8 +45,17 @@ export const isGoodTeam = (team: Team) => team === "townsfolk" || team === "outs
 /** Fábulas y Lóricos: personajes del Narrador. No son jugadores ni salen de la bolsa. */
 export const isStorytellerTeam = (team: Team) => team === "fabled" || team === "loric";
 
-/** Incompatibilidad oficial (jinx): regla especial cuando dos personajes están en juego a la vez. */
-export interface Jinx {
+/** Regla o aclaración que solo aplica cuando dos personajes coinciden en la partida. */
+export interface CharacterPair {
   characterIds: [string, string];
   text: string;
+}
+
+/** Incompatibilidad oficial (jinx): regla especial cuando dos personajes están en juego a la vez. */
+export type Jinx = CharacterPair;
+
+/** Interacción de la wiki: cómo se resuelven dos habilidades juntas (solo para el Narrador). */
+export interface Interaction extends CharacterPair {
+  /** Resolución oficial de The Pandemonium Institute (el resto son de la comunidad). */
+  official?: boolean;
 }
