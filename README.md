@@ -42,7 +42,7 @@ npm install
 npm run dev
 ```
 
-Sin configurar nada funciona en modo manual y guarda las partidas en el navegador.
+Sin configurar nada funciona en modo manual y guarda las partidas en el navegador. Si ya tienes Supabase en `.env.local` y quieres probar como Narrador sin contraseña, `npx vite --mode sinnube` arranca sin la nube (en la app de escritorio, la configuración `grimorio-sin-nube`).
 
 ```bash
 npm test        # reglas del dominio

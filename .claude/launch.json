@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "5174", "--strictPort", "--host", "127.0.0.1"],
       "port": 5174
+    },
+    {
+      "name": "grimorio-sin-nube",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--mode", "sinnube", "--port", "5175", "--strictPort", "--host", "127.0.0.1"],
+      "port": 5175
     }
   ]
 }
