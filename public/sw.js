@@ -1,8 +1,10 @@
 // Service worker del Grimorio: permite instalar la app y que abra aunque la cobertura sea mala.
 // · La página se pide primero a la red (para tener siempre la última versión) y, si no hay, la guardada.
 // · Los archivos de /assets llevan un hash en el nombre: se guardan y se sirven desde la caché.
+// · Los iconos de los personajes (/roles) y los logos e iconos de la wiki (/img) también: así el Grimorio
+//   sale entero aunque no haya cobertura.
 // · Nada de Supabase, OpenRouter ni otras webs pasa por aquí.
-const CACHE = "grimorio-v2";
+const CACHE = "grimorio-v3";
 const SHELL = ["./", "./manifest.webmanifest", "./favicon.png", "./logo.webp", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -41,7 +43,7 @@ self.addEventListener("fetch", (event) => {
       (cached) =>
         cached ||
         fetch(request).then((response) => {
-          if (response.ok && url.pathname.includes("/assets/")) {
+          if (response.ok && /\/(assets|roles|img)\//.test(url.pathname)) {
             const copy = response.clone();
             caches.open(CACHE).then((cache) => cache.put(request, copy));
           }

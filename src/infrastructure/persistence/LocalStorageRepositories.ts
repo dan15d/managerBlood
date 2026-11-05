@@ -1,4 +1,4 @@
-import type { GameRepository } from "@application/ports/GameRepository";
+import { GameConflictError, type GameRepository } from "@application/ports/GameRepository";
 import type { CustomScriptRepository } from "@application/ports/ScriptRepository";
 import type { AdminAuth, TablePublisher } from "@application/ports/TableGateway";
 import { summarize } from "@application/use-cases/GameUseCases";
@@ -11,7 +11,7 @@ import type { Script } from "@domain/entities/Script";
 class JsonStore<T extends { id: string }> {
   private memory: Record<string, T> = {};
 
-  constructor(private readonly key: string) {}
+  constructor(readonly key: string) {}
 
   read(): Record<string, T> {
     try {
@@ -43,13 +43,23 @@ export class LocalStorageGameRepository implements GameRepository {
     return this.store.read()[id] ?? null;
   }
 
-  async save(game: Game) {
-    this.store.write({ ...this.store.read(), [game.id]: game });
+  async save(game: Game, expectUpdatedAt?: string) {
+    const all = this.store.read();
+    if (expectUpdatedAt !== undefined && all[game.id] && all[game.id].updatedAt !== expectUpdatedAt) throw new GameConflictError();
+    this.store.write({ ...all, [game.id]: game });
   }
 
   async delete(id: string) {
     const { [id]: _removed, ...rest } = this.store.read();
     this.store.write(rest);
+  }
+
+  /** Otra pestaña del mismo navegador: el navegador avisa cuando cambia lo guardado. */
+  watch(id: string, onChange: (game: Game | null) => void) {
+    if (typeof window === "undefined") return () => undefined;
+    const listener = (e: StorageEvent) => e.key === this.store.key && onChange(this.store.read()[id] ?? null);
+    window.addEventListener("storage", listener);
+    return () => window.removeEventListener("storage", listener);
   }
 }
 

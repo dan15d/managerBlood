@@ -1,4 +1,5 @@
-import type { GameRepository, GameSummary } from "@application/ports/GameRepository";
+import { GameConflictError, type GameRepository, type GameSummary } from "@application/ports/GameRepository";
+import type { Unsubscribe } from "@application/ports/TableGateway";
 import type { CustomScriptRepository } from "@application/ports/ScriptRepository";
 import { summarize } from "@application/use-cases/GameUseCases";
 import type { Game } from "@domain/entities/Game";
@@ -61,12 +62,10 @@ export class SupabaseGameRepository implements GameRepository {
     return (data?.data as Game) ?? null;
   }
 
-  async save(game: Game) {
+  async save(game: Game, expectUpdatedAt?: string) {
     const owner = await ownerId(this.client);
     const s = summarize(game);
-    const { error } = await this.client.from("games").upsert({
-      id: game.id,
-      owner_id: owner,
+    const row = {
       name: s.name,
       script_name: s.scriptName,
       player_count: s.playerCount,
@@ -75,8 +74,33 @@ export class SupabaseGameRepository implements GameRepository {
       join_code: game.joinCode,
       data: game,
       updated_at: game.updatedAt,
-    });
+    };
+    if (expectUpdatedAt === undefined) {
+      const { error } = await this.client.from("games").upsert({ id: game.id, owner_id: owner, ...row });
+      fail("guardar la partida", error);
+      return;
+    }
+    // Solo si nadie la ha guardado desde que este dispositivo la vio: así no se pisa a otro Narrador.
+    const { data, error } = await this.client
+      .from("games")
+      .update(row)
+      .eq("id", game.id)
+      .eq("data->>updatedAt", expectUpdatedAt)
+      .select("id");
     fail("guardar la partida", error);
+    if (!data?.length) throw new GameConflictError();
+  }
+
+  /** Cambios en la partida desde otro dispositivo (la tabla games está en la publicación de Realtime). */
+  watch(id: string, onChange: (game: Game | null) => void): Unsubscribe {
+    const refresh = () => this.get(id).then(onChange, () => undefined);
+    const channel = this.client
+      .channel(`game:${id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${id}` }, refresh)
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "games", filter: `id=eq.${id}` }, () => onChange(null))
+      // Al conectar se vuelve a leer, por si cambió algo entre cargar la partida y quedar suscrito.
+      .subscribe((status) => status === "SUBSCRIBED" && refresh());
+    return () => void this.client.removeChannel(channel);
   }
 
   async delete(id: string) {

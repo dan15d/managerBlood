@@ -1,5 +1,5 @@
 import type { AppSettings } from "@application/ports/SettingsStore";
-import { AskAiAdvice, CreateGame, DeleteGame, ListGames, LoadGame, SaveGame, TestAiConnection } from "@application/use-cases/GameUseCases";
+import { AskAiAdvice, CreateGame, DeleteGame, ListGames, LoadGame, SaveGame, TestAiConnection, WatchGame } from "@application/use-cases/GameUseCases";
 import { DeleteCustomScript, ListScripts, ParseScriptJson, SaveCustomScript } from "@application/use-cases/ScriptUseCases";
 import { CompleteManualSetup, GenerateAiSetup, SuggestRandomSetup } from "@application/use-cases/SetupUseCases";
 import { AdminSession, ManageLobby, PlayerTable } from "@application/use-cases/TableUseCases";
@@ -62,6 +62,7 @@ export function buildContainer(settings: AppSettings) {
     listGames: new ListGames(games),
     loadGame: new LoadGame(games),
     saveGame: new SaveGame(games, publisher, catalog),
+    watchGame: new WatchGame(games),
     deleteGame: new DeleteGame(games, publisher),
     askAi: new AskAiAdvice(ai, catalog, guides),
     readGuide: new ReadCharacterGuide(catalog, guides),

@@ -1,3 +1,4 @@
+import { GameConflictError } from "@application/ports/GameRepository";
 import { SaveQueue } from "@application/use-cases/SaveQueue";
 import type { Character } from "@domain/entities/Character";
 import type { Game } from "@domain/entities/Game";
@@ -59,6 +60,11 @@ export function GamePage() {
   // Estados anteriores para «Deshacer» (solo en esta pantalla; al recargar se pierden).
   const history = useRef<Game[]>([]);
   const [canUndo, setCanUndo] = useState(false);
+  // Versión que tiene la nube (la cargada, la recibida o la última guardada): al guardar se exige que
+  // siga siendo esa, para no pisar lo que haya hecho otro dispositivo entretanto.
+  const syncedAt = useRef<string | undefined>(undefined);
+  // Versiones guardadas desde aquí: cuando la nube las devuelve por el canal, no son de otro.
+  const ownVersions = useRef<string[]>([]);
   useWakeLock();
 
   useEffect(() => {
@@ -67,6 +73,8 @@ export function GamePage() {
       .execute(id)
       .then(async (g) => {
         gameRef.current = g;
+        syncedAt.current = g.updatedAt;
+        ownVersions.current = [g.updatedAt];
         setGame(g);
         const script = (await app.listScripts.execute()).find((s) => s.id === g.scriptId);
         const ids = script?.characterIds ?? app.catalog.all().map((c) => c.id);
@@ -79,19 +87,68 @@ export function GamePage() {
       });
   }, [app, id, navigate, toast]);
 
-  // Los guardados van en cola; si uno falla (sin cobertura…) se reintenta solo hasta que entre.
-  const saves = useMemo(
-    () =>
-      new SaveQueue<Game>((g) => app.saveGame.execute(g), {
-        onError: (e) => toast(`${errorMessage(e)} Se volverá a intentar solo.`, "error"),
-        onRecovered: () => toast("Guardado: los móviles ya están al día."),
-      }),
-    [app, toast],
+  /** La partida tal como está en la nube (la ha cambiado otro dispositivo): se enseña esa y se olvida lo de aquí. */
+  const adopt = useCallback(
+    (remote: Game | null) => {
+      if (!remote) {
+        toast("La partida ya no existe: se ha borrado desde otro dispositivo.", "error");
+        navigate("/");
+        return;
+      }
+      // Si allí solo se han movido por la hoja de noche, se sigue sin avisar y sin perder el «Deshacer».
+      const quiet = !!gameRef.current && onlyNavigation(gameRef.current, remote);
+      gameRef.current = remote;
+      syncedAt.current = remote.updatedAt;
+      ownVersions.current = [remote.updatedAt];
+      setGame(remote);
+      if (quiet) return;
+      history.current = [];
+      setCanUndo(false);
+      toast("El Grimorio ha cambiado desde otro dispositivo.");
+    },
+    [navigate, toast],
   );
 
+  // Los guardados van en cola; si uno falla (sin cobertura…) se reintenta solo hasta que entre.
+  const saves = useMemo(() => {
+    const queue = new SaveQueue<Game>(
+      async (g) => {
+        try {
+          await app.saveGame.execute(g, syncedAt.current);
+          syncedAt.current = g.updatedAt;
+        } catch (e) {
+          if (!(e instanceof GameConflictError)) throw e;
+          // Otro dispositivo guardó antes: manda su versión y lo que había en cola aquí se descarta.
+          queue.discard();
+          adopt(await app.loadGame.execute(g.id).catch(() => null));
+        }
+      },
+      {
+        onError: (e) => toast(`${errorMessage(e)} Se volverá a intentar solo.`, "error"),
+        onRecovered: () => toast("Guardado: los móviles ya están al día."),
+      },
+    );
+    return queue;
+  }, [app, toast, adopt]);
+
+  // Si la misma partida está abierta en otro dispositivo (el PC y el móvil), lo que se hace allí llega aquí.
+  useEffect(() => {
+    if (!id) return;
+    return app.watchGame.execute(id, (remote) => {
+      if (!gameRef.current) return;
+      if (remote && ownVersions.current.includes(remote.updatedAt)) return;
+      saves.discard();
+      adopt(remote);
+    });
+  }, [app, id, saves, adopt]);
+
   const persist = useCallback(
-    (next: Game) => {
+    (game: Game) => {
+      // Cada guardado lleva su hora, aunque la regla no la cambie (moverse por la hoja de noche):
+      // así el otro dispositivo distingue cada versión.
+      const next = game.updatedAt === gameRef.current?.updatedAt ? { ...game, updatedAt: new Date().toISOString() } : game;
       gameRef.current = next;
+      ownVersions.current = [...ownVersions.current.slice(-49), next.updatedAt];
       setGame(next);
       void saves.save(next);
     },

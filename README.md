@@ -78,6 +78,7 @@ src/
 - Todos los Narradores ven todas las partidas: con la contraseña entras desde el móvil o el PC y tienes lo mismo.
 - Los jugadores solo pueden leer su asiento (`game_seats`) y la información pública de su partida (`game_public`); el Grimorio (`games`) es solo de Narradores. Lo hacen cumplir las políticas RLS de `supabase/migrations/`.
 - Tiempo real con Supabase Realtime: el Narrador ve entrar a los jugadores; los jugadores reciben su personaje y los cambios (fase, muertes) al momento.
+- El Grimorio se puede tener abierto en dos dispositivos a la vez (el PC y el móvil): lo que se hace en uno llega al otro al momento. Si los dos cambian la partida a la vez, manda la primera que llegó a la nube y el otro dispositivo la carga, avisando. Hace falta la migración `20261104000000_grimorio_en_tiempo_real.sql`.
 
 Para poner o cambiar la contraseña de Narrador, en Supabase → SQL Editor:
 
@@ -122,4 +123,4 @@ Para pruebas sin Supabase: en **Ajustes** de la app se puede pegar una clave de 
 
 ## Datos
 
-Los iconos de los personajes se cargan directamente desde la wiki de Villacuervos (no se copian al repositorio). Si no cargan, la ficha muestra sus iniciales. Los textos de los personajes son de la wiki de Villacuervos y el orden de noche del repositorio oficial `ThePandemoniumInstitute/botc-release`. Blood on the Clocktower es una marca de The Pandemonium Institute; este proyecto es una herramienta no oficial para uso personal.
+Los iconos de los personajes son los de la wiki de Villacuervos, en `public/roles` como WebP de 256 px (`node scripts/icons.mjs` los vuelve a descargar y convertir; necesita `npm install --no-save sharp`). Si alguno no carga, la ficha muestra sus iniciales. Los textos de los personajes son de la wiki de Villacuervos y el orden de noche del repositorio oficial `ThePandemoniumInstitute/botc-release`. Blood on the Clocktower es una marca de The Pandemonium Institute; este proyecto es una herramienta no oficial para uso personal.

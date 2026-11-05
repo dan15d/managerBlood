@@ -11,6 +11,7 @@ import type { AiStoryteller } from "../ports/AiStoryteller";
 import type { CharacterCatalog } from "../ports/CharacterCatalog";
 import type { CharacterGuideSource } from "../ports/CharacterGuides";
 import type { GameRepository, GameSummary } from "../ports/GameRepository";
+import type { Unsubscribe } from "../ports/TableGateway";
 import type { IdGenerator } from "../ports/IdGenerator";
 import type { TablePublisher } from "../ports/TableGateway";
 
@@ -147,9 +148,18 @@ export class SaveGame {
     private readonly catalog: CharacterCatalog,
   ) {}
 
-  async execute(game: Game) {
-    await this.repo.save(game);
+  /** Con `expectUpdatedAt`, solo si nadie la ha guardado desde esa versión (ver GameRepository). */
+  async execute(game: Game, expectUpdatedAt?: string) {
+    await this.repo.save(game, expectUpdatedAt);
     await this.publisher.publish(game, this.catalog.map());
+  }
+}
+
+/** Sigue la partida mientras está abierta: si cambia desde otro dispositivo, llega la versión nueva. */
+export class WatchGame {
+  constructor(private readonly repo: GameRepository) {}
+  execute(id: string, onChange: (game: Game | null) => void): Unsubscribe {
+    return this.repo.watch(id, onChange);
   }
 }
 

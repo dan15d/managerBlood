@@ -6,6 +6,8 @@ export class SaveQueue<T> {
   private chain: Promise<void> = Promise.resolve();
   private pending: T | null = null;
   private failing = false;
+  /** Sube con cada `discard`: los guardados encolados antes ya no se hacen. */
+  private generation = 0;
 
   constructor(
     private readonly saveFn: (item: T) => Promise<void>,
@@ -24,9 +26,13 @@ export class SaveQueue<T> {
 
   save(item: T): Promise<void> {
     this.pending = item;
+    const generation = this.generation;
     this.chain = this.chain
-      .then(() => this.saveFn(item))
       .then(() => {
+        if (generation === this.generation) return this.saveFn(item);
+      })
+      .then(() => {
+        if (generation !== this.generation) return;
         // Si entretanto llegó algo más nuevo, ese ya se guardará.
         if (this.pending !== item) return;
         this.pending = null;
@@ -40,6 +46,13 @@ export class SaveQueue<T> {
         this.failing = true;
       });
     return this.chain;
+  }
+
+  /** Olvida lo que faltaba por guardar: la partida ha cambiado en otro sitio y manda esa versión. */
+  discard() {
+    this.generation++;
+    this.pending = null;
+    this.failing = false;
   }
 
   /** Vuelve a intentar lo último que falló. Si no falta nada, no hace nada. */
