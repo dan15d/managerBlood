@@ -160,15 +160,8 @@ export function PlayerPage() {
                       </div>
                     )}
                     {view.timerEndsAt && <Countdown endsAt={view.timerEndsAt} />}
-                    <div className="stat-row">
-                      <div className="stat">
-                        <span className="big-number">{alive}</span>
-                        <span>vivos</span>
-                      </div>
-                      <div className="stat">
-                        <span className="big-number">{Math.ceil(alive / 2)}</span>
-                        <span title="Votos necesarios para ejecutar">votos</span>
-                      </div>
+                    <div className="stat-line">
+                      <strong>{alive}</strong> vivos · <strong>{Math.ceil(alive / 2)}</strong> <span title="Votos necesarios para ejecutar">votos</span>
                     </div>
                   </>
                 }

@@ -19,38 +19,46 @@ interface Props {
   onChange: (mutate: (g: Game) => Game) => void;
   /** Elegir un recordatorio y después tocar al jugador en el Grimorio. */
   onPickReminder: (sourceCharacterId: string, label: string) => void;
+  /** La hoja para ponerlos o quitarlos se abre desde el menú de la partida. */
+  adding: boolean;
+  onAddingChange: (adding: boolean) => void;
 }
 
-/** Fábulas y Lóricos en juego, fuera del círculo como en el Grimorio físico. */
-export function FabledBar({ game, characters, jinxes, onChange, onPickReminder }: Props) {
-  const [adding, setAdding] = useState(false);
+/**
+ * Fábulas y Lóricos en juego, fuera del círculo como en el Grimorio físico. Si no hay ninguno
+ * (ni incompatibilidades que avisar), no ocupa sitio: se añaden desde el menú de la partida.
+ */
+export function FabledBar({ game, characters, jinxes, onChange, onPickReminder, adding, onAddingChange }: Props) {
   const [open, setOpen] = useState<Character | null>(null);
   const [showing, setShowing] = useState(false);
   const inPlay = (game.fabledIds ?? []).map((id) => characters.get(id)).filter((c): c is Character => !!c);
   const all = [...characters.values()].filter((c) => isStorytellerTeam(c.team));
   const gameJinxes = jinxesAmong(gameCharacterIds(game), jinxes);
+  const jinxWarning = gameJinxes.length > 0 && !inPlay.some((c) => c.id === DJINN);
 
   return (
     <>
-      <div className="fabled-row" aria-label={`${TEAM_LABEL.fabled.plural} y ${TEAM_LABEL.loric.plural}`}>
-        {inPlay.map((c) => (
-          <button key={c.id} type="button" className="fabled-row__item" onClick={() => setOpen(c)}>
-            <Token character={c} size={52} />
-            <span className={`team-${c.team}`}>{c.name}</span>
+      {(inPlay.length > 0 || jinxWarning) && (
+        <div className="fabled-row" aria-label={`${TEAM_LABEL.fabled.plural} y ${TEAM_LABEL.loric.plural}`}>
+          {inPlay.map((c) => (
+            <button key={c.id} type="button" className="fabled-row__item" onClick={() => setOpen(c)}>
+              <Token character={c} size={52} />
+              <span className={`team-${c.team}`}>{c.name}</span>
+            </button>
+          ))}
+          <button type="button" className="btn btn--small btn--ghost" aria-label="Fábulas y Lóricos" onClick={() => onAddingChange(true)}>
+            <Plus /> {inPlay.length ? "" : "Fábulas y Lóricos"}
           </button>
-        ))}
-        <button type="button" className="btn btn--small btn--ghost" onClick={() => setAdding(true)}>
-          <Plus /> {inPlay.length ? "Fábulas" : "Fábulas y Lóricos"}
-        </button>
-        {gameJinxes.length > 0 && !inPlay.some((c) => c.id === DJINN) && (
-          <button type="button" className="btn btn--small btn--ghost team-fabled" onClick={() => setOpen(characters.get(DJINN) ?? null)}>
-            {gameJinxes.length} {gameJinxes.length === 1 ? "incompatibilidad" : "incompatibilidades"}
-          </button>
-        )}
-      </div>
+          {jinxWarning && (
+            <button type="button" className="btn btn--small btn--ghost team-fabled" onClick={() => setOpen(characters.get(DJINN) ?? null)}>
+              {gameJinxes.length} {gameJinxes.length === 1 ? "incompatibilidad" : "incompatibilidades"}
+            </button>
+          )}
+        </div>
+      )}
 
       {adding && (
-        <Sheet onClose={() => setAdding(false)} title="Fábulas y Lóricos" label="Fábulas y Lóricos">
+        <Sheet onClose={() => onAddingChange(false)} title="Fábulas y Lóricos" label="Fábulas y Lóricos">
           <p className="muted small" style={{ marginTop: 0 }}>
             Anúncialos a la mesa al ponerlos o quitarlos. Los jugadores los ven en su móvil.
           </p>

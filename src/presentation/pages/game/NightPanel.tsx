@@ -12,7 +12,7 @@ import { Sheet } from "../../components/Sheet";
 import { INFO_HEADINGS, ShowCard } from "../../components/ShowCard";
 import { Token } from "../../components/Token";
 import { NIGHT_ICONS } from "../../wikiAssets";
-import { Check, ChevronLeft, ChevronRight, Eye, Lightbulb, Pointer, Skull, Sun, TriangleAlert, VenetianMask } from "lucide-react";
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, Lightbulb, Pointer, Skull, Sun, TriangleAlert, VenetianMask } from "lucide-react";
 import { choiceReminder, CHOICE_WITHOUT_REMINDER, infoHints } from "@domain/services/NightInfo";
 
 interface Props {
@@ -37,7 +37,7 @@ interface Card {
 const DISABLING = /envenen|borrach|sin habilidad|loc[oa]|enloquec/i;
 
 /** Icono del paso: la ficha del personaje o el de la hoja de noche (crepúsculo, Esbirros…). */
-function StepIcon({ step, size }: { step: NightStep; size: number }) {
+export function StepIcon({ step, size }: { step: NightStep; size: number }) {
   if (step.character) return <Token character={step.character} size={size} />;
   const src = step.kind === "character" ? undefined : NIGHT_ICONS[step.kind];
   return src ? <img className="step-icon" src={src} alt="" width={size} height={size} /> : null;
@@ -48,6 +48,9 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
   const [card, setCard] = useState<Card | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [philosophising, setPhilosophising] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  // La lista de pasos va plegada (anterior, actual y siguiente): toda la noche solo si se pide.
+  const [allSteps, setAllSteps] = useState(false);
   const { toast } = useApp();
   const [heading, setHeading] = useState<string | undefined>(undefined);
   const index = Math.min(game.nightStep, steps.length - 1);
@@ -111,9 +114,12 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
           </div>
         )}
         {disabled.length > 0 && (
-          <div className="alert alert--warning small">
-            <TriangleAlert /> {disabled.map((p) => `${p.name} (${p.reminders.filter((r) => DISABLING.test(r.label)).map((r) => r.label.toLowerCase()).join(", ")})`).join("; ")}
-            : sin habilidad esta noche. Despiértalo igual y dale información falsa si te conviene.
+          <div className="note note--warning">
+            <TriangleAlert />
+            <span>
+              {disabled.map((p) => `${p.name} (${p.reminders.filter((r) => DISABLING.test(r.label)).map((r) => r.label.toLowerCase()).join(", ")})`).join("; ")}
+              : sin habilidad esta noche. Despiértalo igual y dale información falsa si te conviene.
+            </span>
           </div>
         )}
         {step.kind === "character" && step.playerIds.length === 0 && (
@@ -126,16 +132,12 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
 
         <p style={{ margin: "8px 0" }}>{step.instruction}</p>
         {/* La habilidad tal como está en la ficha, por si hay dudas (si no hay texto de noche, ya es la instrucción). */}
-        {step.character && step.character.ability !== step.instruction && (
-          <p className="ability night-card__ability">
-            <span className="small muted">Habilidad · </span>
-            {step.character.ability}
-          </p>
-        )}
+        {step.character && step.character.ability !== step.instruction && <p className="night-card__ability">{step.character.ability}</p>}
 
         {demonBlock && (
-          <div className="alert alert--warning small">
-            <TriangleAlert /> {demonBlock}
+          <div className="note note--warning">
+            <TriangleAlert />
+            <span>{demonBlock}</span>
           </div>
         )}
 
@@ -196,24 +198,26 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
         )}
 
         {step.character && <SpecialCases key={step.key} characterId={step.character.id} inPlayIds={gameCharacterIds(game)} />}
-        {step.character && (
-          <details className="guide__section" key={`guide:${step.key}`} style={{ marginTop: 6 }}>
-            <summary>Guía de {step.character.name}</summary>
-            <div className="guide__body">
-              <CharacterGuide characterId={step.character.id} audience="storyteller" />
-            </div>
-          </details>
-        )}
 
         {step.deathNote ? (
-          <div className={`alert ${step.deathNote.wake ? "alert--info" : "alert--warning"} small`}>{step.deathNote.text}</div>
+          <div className={`note ${step.deathNote.wake ? "note--info" : "note--warning"}`}>
+            <span>{step.deathNote.text}</span>
+          </div>
         ) : (
-          step.dead && <div className="alert alert--warning small">Está muerto: sáltalo, salvo que su habilidad diga que actúa al morir.</div>
+          step.dead && (
+            <div className="note note--warning">
+              <Skull />
+              <span>Está muerto: sáltalo, salvo que su habilidad diga que actúa al morir.</span>
+            </div>
+          )
         )}
         {!!step.deceivedPlayerIds?.length && (
-          <div className="alert alert--warning small">
-            <VenetianMask /> {step.deceivedPlayerIds.map((id) => player(id).name).join(", ")} solo cree ser {step.title}: no tiene esta habilidad.
-            Dale información falsa (o verdadera, si confunde más).
+          <div className="note note--warning">
+            <VenetianMask />
+            <span>
+              {step.deceivedPlayerIds.map((id) => player(id).name).join(", ")} solo cree ser {step.title}: no tiene esta habilidad. Dale
+              información falsa (o verdadera, si confunde más).
+            </span>
           </div>
         )}
 
@@ -277,10 +281,18 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
             <Pointer /> Elegir personaje…
           </button>
         )}
+        {/* Lo secundario, en una fila al final: la guía de la wiki y enseñar cualquier personaje. */}
         {step.kind === "character" && (
-          <button className="btn btn--block btn--ghost" style={{ marginTop: 6 }} onClick={() => setChoosing(true)}>
-            <Eye /> Enseñar un personaje…
-          </button>
+          <div className="night-card__tools">
+            {step.character && (
+              <button className="btn btn--small btn--ghost" onClick={() => setGuideOpen(true)}>
+                <BookOpen /> Guía
+              </button>
+            )}
+            <button className="btn btn--small btn--ghost" onClick={() => setChoosing(true)}>
+              <Eye /> Enseñar un personaje…
+            </button>
+          </div>
         )}
 
         {step.kind === "dawn" && (
@@ -310,19 +322,32 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
       </div>
 
       <ol className="night-list" aria-label="Orden de la noche">
-        {steps.map((s, i) => (
-          <li key={s.key}>
-            <button
-              className={`night-item ${i === index ? "night-item--current" : ""} ${i < index ? "night-item--done" : ""} ${s.dead ? "night-item--skip" : ""}`}
-              onClick={() => onChange((g) => rules.setNightStep(g, i))}
-            >
-              <StepIcon step={s} size={30} />
-              <span style={{ flex: 1 }}>{s.title}</span>
-              <span className="muted small">{s.playerIds.map((id) => player(id).name).join(", ")}</span>
-            </button>
-          </li>
-        ))}
+        {steps.map((s, i) =>
+          allSteps || Math.abs(i - index) <= 1 ? (
+            <li key={s.key}>
+              <button
+                className={`night-item ${i === index ? "night-item--current" : ""} ${i < index ? "night-item--done" : ""} ${s.dead ? "night-item--skip" : ""}`}
+                onClick={() => onChange((g) => rules.setNightStep(g, i))}
+              >
+                <StepIcon step={s} size={30} />
+                <span style={{ flex: 1 }}>{s.title}</span>
+                <span className="muted small">{s.playerIds.map((id) => player(id).name).join(", ")}</span>
+              </button>
+            </li>
+          ) : null,
+        )}
       </ol>
+      {steps.length > 3 && (
+        <button className="btn btn--small btn--ghost night-list__toggle" aria-expanded={allSteps} onClick={() => setAllSteps(!allSteps)}>
+          {allSteps ? <ChevronUp /> : <ChevronDown />} {allSteps ? "Solo el paso actual" : `Toda la noche (${steps.length} pasos)`}
+        </button>
+      )}
+
+      {guideOpen && step.character && (
+        <Sheet onClose={() => setGuideOpen(false)} title={`Guía de ${step.character.name}`} label={`Guía de ${step.character.name}`}>
+          <CharacterGuide characterId={step.character.id} audience="storyteller" />
+        </Sheet>
+      )}
 
       {choosing && (
         <Sheet onClose={() => setChoosing(false)} title="Enseñar un personaje" label="Enseñar un personaje">

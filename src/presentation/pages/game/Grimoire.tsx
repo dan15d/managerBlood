@@ -104,15 +104,8 @@ export function Grimoire({ game, characters, highlighted, hidden, picking, cente
               {game.phase.kind === "night" ? <Moon /> : <Sun />} {phaseLabel(game.phase)}
             </div>
             {centerNote && <div className="circle__note">{centerNote}</div>}
-            <div className="stat-row">
-              <div className="stat">
-                <span className="big-number">{alive}</span>
-                <span>vivos</span>
-              </div>
-              <div className="stat">
-                <span className="big-number">{voteThreshold(game)}</span>
-                <span title="Votos necesarios para ejecutar">votos</span>
-              </div>
+            <div className="stat-line">
+              <strong>{alive}</strong> vivos · <strong>{voteThreshold(game)}</strong> <span title="Votos necesarios para ejecutar">votos</span>
             </div>
           </>
         )

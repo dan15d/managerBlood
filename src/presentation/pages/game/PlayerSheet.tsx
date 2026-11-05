@@ -45,6 +45,9 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
     .map((id) => characters.get(id))
     .filter((c): c is Character => !!c && c.reminders.length > 0)
     .sort((a, b) => TEAM_ORDER.indexOf(a.team) - TEAM_ORDER.indexOf(b.team));
+  // A mano, los recordatorios de su propio personaje (y del que cree ser); los de los demás, plegados.
+  const own = inPlay.filter((c) => c.id === player.characterId || c.id === player.shownCharacterId);
+  const others = inPlay.filter((c) => !own.includes(c));
 
   const add = (sourceCharacterId: string, label: string) =>
     onChange((g) => rules.addReminder(g, player.id, { id: newId(), sourceCharacterId, label }));
@@ -183,27 +186,39 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
           )}
 
           <div className="stack" style={{ gap: 10, marginTop: 12 }}>
-            {inPlay.map((c) => (
-              <div key={c.id}>
-                <div className={`small team-${c.team}`} style={{ marginBottom: 4 }}>
-                  {c.name}
-                </div>
-                <div className="chips">
-                  {[...new Set(c.reminders)].map((label) => (
-                    <button key={label} className="chip" onClick={() => add(c.id, label)}>
-                      + {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
             <div className="chips">
+              {own.flatMap((c) => [...new Set(c.reminders)].map((label) => ({ c, label }))).map(({ c, label }) => (
+                <button key={`${c.id}:${label}`} className="chip chip--reminder" onClick={() => add(c.id, label)}>
+                  + {label}
+                </button>
+              ))}
               {GENERIC_REMINDERS.map((label) => (
                 <button key={label} className="chip" onClick={() => add("custom", label)}>
                   + {label}
                 </button>
               ))}
             </div>
+            {others.length > 0 && (
+              <details className="more more--tight">
+                <summary>De otros personajes ({others.length})</summary>
+                <div className="stack" style={{ gap: 10, marginTop: 8 }}>
+                  {others.map((c) => (
+                    <div key={c.id}>
+                      <div className={`small team-${c.team}`} style={{ marginBottom: 4 }}>
+                        {c.name}
+                      </div>
+                      <div className="chips">
+                        {[...new Set(c.reminders)].map((label) => (
+                          <button key={label} className="chip" onClick={() => add(c.id, label)}>
+                            + {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
             <form
               className="row"
               onSubmit={(e) => {

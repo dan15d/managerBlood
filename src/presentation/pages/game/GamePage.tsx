@@ -9,15 +9,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../../app/AppContext";
 import { CharacterPicker } from "../../components/CharacterPicker";
+import { LogList } from "../../components/LogList";
+import { Menu } from "../../components/Menu";
 import { Sheet } from "../../components/Sheet";
 import { AiPanel } from "./AiPanel";
 import { DayPanel } from "./DayPanel";
 import { FabledBar } from "./FabledBar";
 import { Grimoire } from "./Grimoire";
 import { NightPanel } from "./NightPanel";
+import { NightStrip } from "./NightStrip";
 import { PhaseClock } from "./PhaseClock";
 import { PlayerSheet } from "./PlayerSheet";
-import { ArrowLeft, ArrowLeftRight, Eye, EyeOff, Flag, Moon, ScrollText, Smartphone, Sparkles, Sun, Undo2 } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Eye, EyeOff, Flag, Moon, ScrollText, Smartphone, Sparkles, Sun, Undo2, WandSparkles } from "lucide-react";
 import { useWakeLock } from "../../hooks/useWakeLock";
 
 type Tab = "phase" | "ai" | "log";
@@ -57,6 +60,7 @@ export function GamePage() {
   const [dismissedHint, setDismissedHint] = useState("");
   const [pick, setPick] = useState<Pick | null>(null);
   const [ending, setEnding] = useState(false);
+  const [addingFabled, setAddingFabled] = useState(false);
   const [pitHagTarget, setPitHagTarget] = useState<string | null>(null);
   const characters = app.catalog.map();
   const gameRef = useRef<Game | null>(null);
@@ -354,52 +358,43 @@ export function GamePage() {
 
   return (
     <main className="page page--wide page--flow">
+      {/* Barra corta: lo de cada momento a mano (deshacer, ocultar) y el resto en el menú «…». */}
       <div className="game-bar">
         <Link to="/" className="btn btn--ghost icon-btn" aria-label="Volver a partidas">
           <ArrowLeft />
         </Link>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {game.name}
-          </div>
-          <div className="muted small">
+        <div className="game-bar__title">
+          <div className="game-bar__name">{game.name}</div>
+          <div className="muted small game-bar__sub">
             {game.scriptName} · {game.players.length} jugadores
           </div>
         </div>
-        <button className="btn btn--small" disabled={!canUndo} onClick={undo} aria-label="Deshacer" title="Deshace el último cambio del Grimorio">
+        <button className="btn btn--ghost icon-btn" disabled={!canUndo} onClick={undo} aria-label="Deshacer" title="Deshace el último cambio del Grimorio">
           <Undo2 />
-          <span className="label-wide"> Deshacer</span>
         </button>
         <button
-          className="btn btn--small"
+          className="btn btn--ghost icon-btn"
           aria-pressed={hidden}
           aria-label={hidden ? "Mostrar personajes" : "Ocultar personajes"}
           onClick={() => setHidden(!hidden)}
           title="Oculta los personajes por si alguien mira la pantalla"
         >
           {hidden ? <Eye /> : <EyeOff />}
-          <span className="label-wide">{hidden ? " Mostrar" : " Ocultar"}</span>
         </button>
-        <button
-          className="btn btn--small"
-          aria-pressed={pick?.kind === "seat"}
-          aria-label="Cambiar sitios"
-          onClick={() => setPick(pick?.kind === "seat" ? null : { kind: "seat" })}
-          title="Toca dos jugadores para cambiarlos de sitio"
-        >
-          <ArrowLeftRight />
-          <span className="label-wide"> Sitios</span>
-        </button>
-        <Link to={`/partida/${game.id}/revelar`} className="btn btn--small" aria-label="Repartir personajes">
-          <Smartphone />
-          <span className="label-wide"> Repartir</span>
-        </Link>
-        {game.status !== "finished" && (
-          <button className="btn btn--small" aria-label="Terminar la partida" title="Declarar quién gana" onClick={() => setEnding(true)}>
-            <Flag />
-            <span className="label-wide"> Terminar</span>
-          </button>
-        )}
+        <Menu
+          label="Más acciones"
+          items={[
+            {
+              icon: <ArrowLeftRight />,
+              label: pick?.kind === "seat" ? "Dejar de cambiar sitios" : "Cambiar sitios",
+              pressed: pick?.kind === "seat",
+              onSelect: () => setPick(pick?.kind === "seat" ? null : { kind: "seat" }),
+            },
+            { icon: <Smartphone />, label: "Repartir personajes", onSelect: () => navigate(`/partida/${game.id}/revelar`) },
+            { icon: <WandSparkles />, label: "Fábulas y Lóricos…", onSelect: () => setAddingFabled(true) },
+            ...(game.status !== "finished" ? [{ icon: <Flag />, label: "Terminar la partida", danger: true, onSelect: () => setEnding(true) }] : []),
+          ]}
+        />
       </div>
 
       {ending && (
@@ -510,10 +505,22 @@ export function GamePage() {
             onSelect={tapPlayer}
             onRemoveReminder={(pid, rid) => change((g) => rules.removeReminder(g, pid, rid))}
           />
+          {/* En el móvil, el paso de la noche y su acción principal justo bajo el círculo: sin bajar al panel. */}
+          {night && step && game.status === "in_progress" && (
+            <NightStrip
+              game={game}
+              steps={steps}
+              characters={characters}
+              onChange={change}
+              onPickReminder={(sourceId, label) => setPick({ kind: "reminder", sourceId, label, advance: true })}
+            />
+          )}
           <FabledBar
             game={game}
             characters={characters}
             jinxes={app.catalog.jinxes()}
+            adding={addingFabled}
+            onAddingChange={setAddingFabled}
             onChange={change}
             onPickReminder={(sourceId, label) => {
               setPick({ kind: "reminder", sourceId, label });
@@ -575,16 +582,7 @@ export function GamePage() {
                 />
               ))}
             {tab === "ai" && <AiPanel game={game} />}
-            {tab === "log" && (
-              <ul className="log">
-                {[...game.log].reverse().map((l, i) => (
-                  <li key={i}>
-                    <span className="muted small">{l.phase} · </span>
-                    {l.text}
-                  </li>
-                ))}
-              </ul>
-            )}
+            {tab === "log" && <LogList log={game.log} />}
           </div>
         </section>
       </div>

@@ -11,9 +11,12 @@ interface Props {
 /** Duraciones de la cuenta atrás, en segundos (nominaciones cortas, debate largo). */
 const PRESETS = [60, 180, 300];
 
+/** Cuánto lleva la fase: a partir de una hora ya no interesa el segundo (la partida viene de otro día). */
+export const elapsedLabel = (ms: number) => (ms >= 3_600_000 ? `+${Math.floor(ms / 3_600_000)} h` : clock(ms));
+
 /**
- * Cuánto lleva la fase (la noche o el día) y una cuenta atrás para el debate o las nominaciones,
- * que también ven los jugadores en su móvil. Al acabar vibra y pita.
+ * Una línea discreta: cuánto lleva la fase (la noche o el día) y una cuenta atrás para el debate
+ * o las nominaciones, que también ven los jugadores en su móvil. Al acabar vibra y pita.
  */
 export function PhaseClock({ game, onChange }: Props) {
   const now = useNow(game.status === "in_progress");
@@ -26,7 +29,7 @@ export function PhaseClock({ game, onChange }: Props) {
   return (
     <div className={`clock ${over ? "clock--over" : ""}`} role="timer">
       <span className="clock__elapsed" title={`Tiempo que lleva ${night ? "la noche" : "el día"}`}>
-        <Timer /> {clock(elapsed)} <span className="muted small">{night ? "de noche" : "de día"}</span>
+        <Timer /> {elapsedLabel(elapsed)} <span className="muted">{night ? "de noche" : "de día"}</span>
       </span>
       {left !== undefined ? (
         <span className="clock__timer">
@@ -36,12 +39,18 @@ export function PhaseClock({ game, onChange }: Props) {
           </button>
         </span>
       ) : (
-        <span className="clock__presets">
+        <span className="clock__presets" aria-label="Cuenta atrás">
           {PRESETS.map((seconds) => (
-            <button key={seconds} className="btn btn--small btn--ghost" onClick={() => onChange((g) => rules.setTimer(g, seconds))}>
-              {seconds / 60} min
+            <button
+              key={seconds}
+              className="btn btn--small btn--ghost"
+              aria-label={`Cuenta atrás de ${seconds / 60} ${seconds === 60 ? "minuto" : "minutos"}`}
+              onClick={() => onChange((g) => rules.setTimer(g, seconds))}
+            >
+              {seconds / 60}
             </button>
           ))}
+          <span className="muted">min</span>
         </span>
       )}
     </div>

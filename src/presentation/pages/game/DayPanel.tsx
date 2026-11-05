@@ -136,17 +136,17 @@ export function DayPanel({ game, characters, onChange, onStartNomination, onStar
           )}
           <div className="row" style={{ justifyContent: "center", gap: 6 }}>
             {!game.executedToday && (
-              <button className="btn btn--small btn--ghost" onClick={onStartExecution}>
+              <button className="btn btn--small" onClick={onStartExecution}>
                 Ejecutar sin votación…
               </button>
             )}
             {travellers.length > 0 && (
-              <button className="btn btn--small btn--ghost" onClick={onStartExile}>
+              <button className="btn btn--small" onClick={onStartExile}>
                 Exiliar a un Viajero…
               </button>
             )}
             {game.players.some((p) => p.characterId === "slayer" || p.shownCharacterId === "slayer") && (
-              <button className="btn btn--small btn--ghost" onClick={onStartShot}>
+              <button className="btn btn--small" onClick={onStartShot}>
                 Disparo del Exterminador…
               </button>
             )}
@@ -172,19 +172,20 @@ export function DayPanel({ game, characters, onChange, onStartNomination, onStar
         </div>
       )}
 
-      {(!game.executedToday || game.butcherNominationId) && (
-        <div className="alert alert--info small">
-          {block ? (
-            <>
+      {(!game.executedToday || game.butcherNominationId) &&
+        (block ? (
+          <div className="note note--info">
+            <span>
               En la picota: <strong>{name(block.playerId)}</strong> con {block.votes} votos.
-            </>
-          ) : game.nominations.some((n) => n.closed && !n.exile) ? (
-            "Nadie está en la picota (sin votos suficientes o empate)."
-          ) : (
-            `Se necesitan ${threshold} votos para ejecutar. Pide nominaciones cuando hayan hablado unos minutos.`
-          )}
-        </div>
-      )}
+            </span>
+          </div>
+        ) : (
+          <p className="muted small" style={{ margin: 0, textAlign: "center" }}>
+            {game.nominations.some((n) => n.closed && !n.exile)
+              ? "Nadie está en la picota: sin votos suficientes o empate."
+              : `${threshold} votos para ejecutar. Pide nominaciones cuando hayan hablado unos minutos.`}
+          </p>
+        ))}
 
       <div className="action-bar">
         {block && !open && (
