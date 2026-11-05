@@ -3,6 +3,7 @@ import { SaveQueue } from "@application/use-cases/SaveQueue";
 import type { Character } from "@domain/entities/Character";
 import type { Game } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
+import { advanceAfterChoice } from "@domain/services/NightInfo";
 import { buildNightOrder, keepNightStep } from "@domain/services/NightOrder";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -28,7 +29,8 @@ const onlyNavigation = (a: Game, b: Game) =>
 
 /** Modo «toca una ficha»: poner un recordatorio o nominar sin abrir la hoja del jugador. */
 type Pick =
-  | { kind: "reminder"; sourceId: string; label: string }
+  /** `advance`: es la acción principal del paso de noche; al tocar, la hoja pasa sola si no queda nada por hacer. */
+  | { kind: "reminder"; sourceId: string; label: string; advance?: boolean }
   | { kind: "nominator" }
   | { kind: "nominee"; nominatorId: string }
   /** Cambiar sitios: se toca a uno y luego a otro, y se intercambian. Sigue activo hasta «Listo». */
@@ -250,7 +252,7 @@ export function GamePage() {
       change((g) => {
         const result = rules.applyReminderChoice(g, pid, reminder, characters);
         message = result.message;
-        return result.game;
+        return pick.advance ? advanceAfterChoice(g, result.game, pid, pick.sourceId, pick.label, characters) : result.game;
       });
       if (message) toast(message);
       return setPick(null);
@@ -541,8 +543,8 @@ export function GamePage() {
                   onOpenPlayer={setSelected}
                   onEditBluffs={() => setEditingBluffs(true)}
                   scriptCharacters={scriptCharacters}
-                  onPickReminder={(sourceId, label) => {
-                    setPick({ kind: "reminder", sourceId, label });
+                  onPickReminder={(sourceId, label, main) => {
+                    setPick({ kind: "reminder", sourceId, label, advance: main });
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                 />

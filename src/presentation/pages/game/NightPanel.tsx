@@ -22,8 +22,8 @@ interface Props {
   onChange: (mutate: (g: Game) => Game) => void;
   onOpenPlayer: (id: string) => void;
   onEditBluffs: () => void;
-  /** Elegir un recordatorio y después tocar al jugador en el Grimorio. */
-  onPickReminder: (sourceCharacterId: string, label: string) => void;
+  /** Elegir un recordatorio y después tocar al jugador en el Grimorio. `main`: es la acción principal del paso. */
+  onPickReminder: (sourceCharacterId: string, label: string, main?: boolean) => void;
   /** Personajes del guion, para enseñar cualquiera en una tarjeta. */
   scriptCharacters: Character[];
 }
@@ -158,9 +158,9 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
           </div>
         )}
 
-        {/* Quien elige a alguien (Envenenador, Monje, Demonio…): un toque y se pone su recordatorio. */}
+        {/* Quien elige a alguien (Envenenador, Monje, Demonio…): un toque y se pone su recordatorio, y la hoja pasa sola si no queda nada que hacer. */}
         {chooser && (
-          <button className="btn btn--primary btn--block" style={{ marginTop: 8 }} onClick={() => onPickReminder(step.character!.id, chooser)}>
+          <button className="btn btn--primary btn--block" style={{ marginTop: 8 }} onClick={() => onPickReminder(step.character!.id, chooser, true)}>
             <Pointer /> Toca a quién elige{CHOICE_WITHOUT_REMINDER.has(step.character!.id) ? "" : ` · «${chooser}»`}
           </button>
         )}

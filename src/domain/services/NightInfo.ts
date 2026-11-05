@@ -80,6 +80,33 @@ export const CHOICE_WITHOUT_REMINDER = new Set(["snakecharmer", "pithag", ...INF
 
 export const isInfoChoice = (characterId: string) => INFO_ON_CHOICE.has(characterId);
 
+/** Eligen a varios jugadores en la misma noche: la hoja espera a que el Narrador termine. */
+const MULTI_CHOICE = new Set(["po", "alhadikhia", "yaggababble"]);
+
+/**
+ * Después de tocar al jugador elegido, la hoja de noche pasa sola al paso siguiente si elegir era
+ * la acción principal del paso y no queda nada por hacer en él. Se queda donde está cuando se
+ * elige para recibir información (hay que darla), cuando faltan más elecciones (Po, Al-Hadikhia…),
+ * cuando después se elige personaje (Pit-Hag) o cuando alguien cambia de personaje (el Demonio que
+ * se mata, el Fang Gu que salta, el Encantador de serpientes): hay que enseñar «TÚ ERES».
+ */
+export function advanceAfterChoice(before: Game, after: Game, targetId: string, sourceCharacterId: string, label: string, characters: Map<string, Character>): Game {
+  if (before.phase.kind !== "night" || after.phase.kind !== "night") return after;
+  if (label !== choiceReminder(sourceCharacterId, before.phase.number === 1)) return after;
+  if (CHOICE_WITHOUT_REMINDER.has(sourceCharacterId) || MULTI_CHOICE.has(sourceCharacterId)) return after;
+  // Se elige a sí mismo (el Demonio que se mata: toca elegir heredero) o alguien cambia de personaje.
+  if (before.players.find((p) => p.id === targetId)?.characterId === sourceCharacterId) return after;
+  const changed = after.players.some((p) => before.players.find((b) => b.id === p.id)?.characterId !== p.characterId);
+  if (changed) return after;
+  const oldSteps = buildNightOrder(before, characters);
+  const current = oldSteps[Math.min(before.nightStep, oldSteps.length - 1)];
+  if (current?.character?.id !== sourceCharacterId) return after;
+  const newSteps = buildNightOrder(after, characters);
+  const index = newSteps.findIndex((s) => s.key === current.key);
+  if (index < 0 || index >= newSteps.length - 1) return after;
+  return { ...after, nightStep: index + 1 };
+}
+
 /**
  * La respuesta para quien elige a un jugador para saber de él (Soñador, Guardián de cuervos,
  * Tonto del pueblo), con los avisos de siempre: Espía o Recluso, Vortox y quien elige sin habilidad.
