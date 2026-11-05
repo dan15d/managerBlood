@@ -1179,6 +1179,55 @@ button.token {
   color: var(--gold-bright);
 }
 
+/* Cronómetro de la fase y cuenta atrás (Grimorio y móvil del jugador). */
+.clock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.clock__elapsed,
+.clock__timer,
+.clock__presets {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clock__timer {
+  font-weight: 700;
+  color: var(--gold-bright);
+}
+
+.clock--over .clock__timer {
+  animation: clock-pulse 1s infinite;
+}
+
+.clock--player {
+  justify-content: center;
+  margin: 6px 0 0;
+  padding: 4px 10px;
+}
+
+@keyframes clock-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.clock svg {
+  width: 16px;
+  height: 16px;
+}
+
 .circle {
   position: relative;
   width: 100%;

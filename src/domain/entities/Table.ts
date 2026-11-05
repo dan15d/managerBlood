@@ -44,6 +44,8 @@ export interface PlayerView {
   characterIds: string[];
   status: TableStatus;
   phaseLabel?: string;
+  /** Cuenta atrás del Narrador (debate, nominaciones): cuándo acaba. */
+  timerEndsAt?: string;
   winner?: Alignment;
   /** Personaje que cree ser (el Borracho ve su Aldeano falso). Sin repartir aún: undefined. */
   characterId?: string;

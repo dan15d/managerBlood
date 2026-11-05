@@ -8,9 +8,25 @@ import { Confirm, Sheet } from "../components/Sheet";
 import { SeatCircle } from "../components/SeatCircle";
 import { Token } from "../components/Token";
 import { usePlayerNotes, type SeatNote } from "../hooks/usePlayerNotes";
-import { Flag, Moon, NotebookPen, ScrollText, Sun, Users } from "lucide-react";
+import { clock, useAlarm, useNow } from "../hooks/useClock";
+import { Flag, Hourglass, Moon, NotebookPen, ScrollText, Sun, Users } from "lucide-react";
 
 type Tab = "script" | "players";
+
+/** La cuenta atrás del Narrador (debate, nominaciones). Al acabar vibra; se va sola al minuto. */
+function Countdown({ endsAt }: { endsAt: string }) {
+  const now = useNow();
+  const left = Date.parse(endsAt) - now;
+  useAlarm(endsAt, now, false);
+  if (left < -60_000) return null;
+  return (
+    <div className={`clock clock--player ${left <= 0 ? "clock--over" : ""}`} role="timer">
+      <span className="clock__timer">
+        <Hourglass /> {left <= 0 ? "¡Tiempo!" : clock(left)}
+      </span>
+    </div>
+  );
+}
 
 /**
  * El móvil de cada jugador: la mesa y el guion, al día sin recargar. Su personaje no: se lo
@@ -143,6 +159,7 @@ export function PlayerPage() {
                         {view.phaseLabel.startsWith("Noche") ? <Moon /> : <Sun />} {view.phaseLabel}
                       </div>
                     )}
+                    {view.timerEndsAt && <Countdown endsAt={view.timerEndsAt} />}
                     <div className="stat-row">
                       <div className="stat">
                         <span className="big-number">{alive}</span>

@@ -338,6 +338,8 @@ export function startDay(game: Game): Game {
   const next = {
     ...game,
     phase: { kind: "day", number: game.phase.number } as Phase,
+    phaseStartedAt: new Date().toISOString(),
+    timer: undefined,
     nominations: [],
     executedToday: undefined,
     nightDeaths: [],
@@ -361,9 +363,33 @@ export function startDay(game: Game): Game {
 
 export function startNight(game: Game): Game {
   if (game.phase.kind !== "day") throw new RuleViolation("Ya es de noche.");
-  const next = { ...game, phase: { kind: "night", number: game.phase.number + 1 } as Phase, nightStep: 0 };
+  const next = {
+    ...game,
+    phase: { kind: "night", number: game.phase.number + 1 } as Phase,
+    nightStep: 0,
+    phaseStartedAt: new Date().toISOString(),
+    timer: undefined,
+  };
   return touch(next, "Cae la noche.");
 }
+
+/** Cuándo empezó la fase actual. En partidas de antes de guardarlo, lo dice el registro. */
+export function phaseStart(game: Game): string {
+  if (game.phaseStartedAt) return game.phaseStartedAt;
+  const change = [...game.log].reverse().find((l) => /^(Cae la noche|Amanece)/.test(l.text));
+  return change?.at ?? game.createdAt;
+}
+
+/** Cuenta atrás para el debate o las nominaciones. No pasa por el registro ni por «Deshacer». */
+export const setTimer = (game: Game, seconds: number, now = new Date()): Game => ({
+  ...game,
+  timer: { endsAt: new Date(now.getTime() + seconds * 1000).toISOString(), seconds },
+});
+
+export const clearTimer = (game: Game): Game => (game.timer ? { ...game, timer: undefined } : game);
+
+/** La información que el Narrador ha dado esta noche, apuntada en el registro. */
+export const noteInfoGiven = (game: Game, lines: string[]): Game => lines.reduce((g, text) => touch(g, text), game);
 
 export const setNightStep = (game: Game, step: number): Game => ({ ...game, nightStep: Math.max(0, step) });
 

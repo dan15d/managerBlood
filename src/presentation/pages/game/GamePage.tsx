@@ -15,6 +15,7 @@ import { DayPanel } from "./DayPanel";
 import { FabledBar } from "./FabledBar";
 import { Grimoire } from "./Grimoire";
 import { NightPanel } from "./NightPanel";
+import { PhaseClock } from "./PhaseClock";
 import { PlayerSheet } from "./PlayerSheet";
 import { ArrowLeft, ArrowLeftRight, Eye, EyeOff, Flag, Moon, ScrollText, Smartphone, Sparkles, Sun, Undo2 } from "lucide-react";
 import { useWakeLock } from "../../hooks/useWakeLock";
@@ -23,9 +24,9 @@ type Tab = "phase" | "ai" | "log";
 
 const UNDO_LIMIT = 30;
 
-/** Solo ha cambiado el paso de la noche (o la hora de guardado). */
+/** Solo ha cambiado el paso de la noche, la cuenta atrás o la hora de guardado: nada del Grimorio. */
 const onlyNavigation = (a: Game, b: Game) =>
-  JSON.stringify({ ...a, nightStep: 0, updatedAt: "" }) === JSON.stringify({ ...b, nightStep: 0, updatedAt: "" });
+  JSON.stringify({ ...a, nightStep: 0, timer: undefined, updatedAt: "" }) === JSON.stringify({ ...b, nightStep: 0, timer: undefined, updatedAt: "" });
 
 /** Modo «toca una ficha»: poner un recordatorio o nominar sin abrir la hoja del jugador. */
 type Pick =
@@ -204,7 +205,8 @@ export function GamePage() {
     if (!previous || !current) return;
     setCanUndo(history.current.length > 0);
     const undone = current.log.length > previous.log.length ? current.log[current.log.length - 1].text : undefined;
-    persist({ ...previous, updatedAt: new Date().toISOString() });
+    // La cuenta atrás no se deshace: sigue la que hay.
+    persist({ ...previous, timer: current.timer, updatedAt: new Date().toISOString() });
     toast(undone ? `Deshecho: ${undone}` : "Deshecho.");
   }, [persist, toast]);
 
@@ -533,6 +535,7 @@ export function GamePage() {
             </button>
           </div>
           <div className="panel__body">
+            {tab === "phase" && game.status === "in_progress" && <PhaseClock game={game} onChange={change} />}
             {tab === "phase" &&
               (night ? (
                 <NightPanel

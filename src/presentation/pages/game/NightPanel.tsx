@@ -12,7 +12,7 @@ import { Sheet } from "../../components/Sheet";
 import { INFO_HEADINGS, ShowCard } from "../../components/ShowCard";
 import { Token } from "../../components/Token";
 import { NIGHT_ICONS } from "../../wikiAssets";
-import { ChevronLeft, ChevronRight, Eye, Lightbulb, Pointer, Skull, Sun, TriangleAlert, VenetianMask } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Eye, Lightbulb, Pointer, Skull, Sun, TriangleAlert, VenetianMask } from "lucide-react";
 import { choiceReminder, CHOICE_WITHOUT_REMINDER, infoHints } from "@domain/services/NightInfo";
 
 interface Props {
@@ -155,6 +155,23 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
                 {c}
               </p>
             ))}
+            {/* Dada la información, se apunta en el registro y la hoja pasa al siguiente paso. */}
+            <div style={{ marginTop: 6 }}>
+              <button
+                className="btn btn--small btn--primary"
+                onClick={() =>
+                  onChange((g) => {
+                    const noted = rules.noteInfoGiven(
+                      g,
+                      hints.map((h) => `${step.character!.name} (${player(h.playerId).name}): ${h.text}`),
+                    );
+                    return last ? noted : rules.setNightStep(noted, index + 1);
+                  })
+                }
+              >
+                <Check /> Dado{last ? "" : " · Siguiente"}
+              </button>
+            </div>
           </div>
         )}
 

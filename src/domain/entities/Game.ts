@@ -61,6 +61,10 @@ export interface Game {
   phase: Phase;
   /** Paso de la hoja de noche en el que va el Narrador. */
   nightStep: number;
+  /** Cuándo empezó la fase actual, para el cronómetro. */
+  phaseStartedAt?: string;
+  /** Cuenta atrás puesta por el Narrador (debate, nominaciones): cuándo acaba y cuánto duraba. */
+  timer?: { endsAt: string; seconds: number };
   nominations: Nomination[];
   executedToday?: string;
   /** La nominación extra del Carnicero hoy, después de la ejecución. */

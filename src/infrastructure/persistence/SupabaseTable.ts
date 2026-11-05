@@ -20,6 +20,7 @@ interface PublicRow {
   winner: string | null;
   players: PublicPlayer[];
   fabled_ids: string[] | null;
+  timer_ends_at: string | null;
 }
 
 interface SeatRow {
@@ -186,6 +187,7 @@ export class SupabaseTablePublisher implements TablePublisher {
       winner: game.winner ?? null,
       players: publicPlayers(game, characters),
       fabled_ids: game.fabledIds ?? [],
+      timer_ends_at: game.timer?.endsAt ?? null,
     };
     const seats = game.players.map((p) => {
       const secret = seatSecret(p, characters, game.fabledIds, publicAlive(game, p));
@@ -263,6 +265,7 @@ export class SupabasePlayerGateway implements PlayerGateway {
       characterIds: table.character_ids,
       status: table.status,
       phaseLabel: table.phase_label ?? undefined,
+      timerEndsAt: table.timer_ends_at ?? undefined,
       winner: (table.winner as PlayerView["winner"]) ?? undefined,
       characterId: seat.shown_character_id ?? undefined,
       alignment: seat.shown_alignment ?? undefined,
