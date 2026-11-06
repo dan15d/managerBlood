@@ -20,6 +20,7 @@ import { NightPanel } from "./NightPanel";
 import { NightStrip } from "./NightStrip";
 import { PhaseClock } from "./PhaseClock";
 import { PlayerSheet } from "./PlayerSheet";
+import { QuickSheet } from "./QuickSheet";
 import { ArrowLeft, ArrowLeftRight, Eye, EyeOff, Flag, Moon, ScrollText, Smartphone, Sparkles, Sun, Undo2, WandSparkles } from "lucide-react";
 import { useWakeLock } from "../../hooks/useWakeLock";
 
@@ -54,6 +55,8 @@ export function GamePage() {
   const [game, setGame] = useState<Game | null>(null);
   const [scriptCharacters, setScriptCharacters] = useState<Character[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  // Jugador tocado en el círculo: mini-hoja de acciones rápidas (la ficha entera se abre desde ella).
+  const [quick, setQuick] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("phase");
   const [hidden, setHidden] = useState(false);
   const [editingBluffs, setEditingBluffs] = useState(false);
@@ -178,6 +181,20 @@ export function GamePage() {
     };
   }, [saves]);
 
+  const undo = useCallback(() => {
+    const previous = history.current.pop();
+    const current = gameRef.current;
+    if (!previous || !current) return;
+    setCanUndo(history.current.length > 0);
+    const undone = current.log.length > previous.log.length ? current.log[current.log.length - 1].text : undefined;
+    // La cuenta atrás no se deshace: sigue la que hay.
+    persist({ ...previous, timer: current.timer, updatedAt: new Date().toISOString() });
+    toast(undone ? `Deshecho: ${undone}` : "Deshecho.", "info", { key: "change" });
+  }, [persist, toast]);
+
+  /** Aviso de lo que acaba de pasar, con «Deshacer» dentro: sustituye al anterior para que no se apilen. */
+  const say = useCallback((message: string) => toast(message, "info", { key: "change", action: { label: "Deshacer", onClick: undo } }), [toast, undo]);
+
   /** Aplica una regla del dominio y guarda (en cola, para no pisar guardados anteriores). */
   const change = useCallback(
     (mutate: (g: Game) => Game) => {
@@ -197,22 +214,13 @@ export function GamePage() {
       if (!onlyNavigation(current, next)) {
         history.current = [...history.current.slice(-(UNDO_LIMIT - 1)), current];
         setCanUndo(true);
+        // Lo que el registro apunta de este cambio se avisa con «Deshacer» a mano.
+        if (next.log.length > current.log.length) say(next.log[next.log.length - 1].text);
       }
       persist(next);
     },
-    [persist, toast, characters],
+    [persist, toast, say, characters],
   );
-
-  const undo = useCallback(() => {
-    const previous = history.current.pop();
-    const current = gameRef.current;
-    if (!previous || !current) return;
-    setCanUndo(history.current.length > 0);
-    const undone = current.log.length > previous.log.length ? current.log[current.log.length - 1].text : undefined;
-    // La cuenta atrás no se deshace: sigue la que hay.
-    persist({ ...previous, timer: current.timer, updatedAt: new Date().toISOString() });
-    toast(undone ? `Deshecho: ${undone}` : "Deshecho.");
-  }, [persist, toast]);
 
   const steps = useMemo(() => (game ? buildNightOrder(game, characters) : []), [game, characters]);
 
@@ -227,6 +235,7 @@ export function GamePage() {
   const night = game.phase.kind === "night";
   const step = night ? steps[Math.min(game.nightStep, steps.length - 1)] : undefined;
   const player = selected ? game.players.find((p) => p.id === selected) : undefined;
+  const quickPlayer = quick ? game.players.find((p) => p.id === quick) : undefined;
   const hint = rules.victoryHint(game, characters);
   const hintKey = hint ? `${hint.winner}:${game.players.map((p) => +p.alive).join("")}` : "";
   const succession = rules.demonSuccession(game, characters);
@@ -237,12 +246,13 @@ export function GamePage() {
   const name = (pid: string) => game.players.find((p) => p.id === pid)?.name ?? "";
 
   const tapPlayer = (pid: string) => {
-    if (!pick) return setSelected(pid);
+    // Sin modo «toca»: la mini-hoja de acciones rápidas (matar, recordatorios) o la ficha entera desde ella.
+    if (!pick) return setQuick(pid);
     if (pick.kind === "seat") {
       if (!pick.fromId) return setPick({ kind: "seat", fromId: pid });
       if (pick.fromId !== pid) {
         change((g) => rules.swapSeats(g, pick.fromId!, pid));
-        toast(`${name(pick.fromId)} y ${name(pid)} cambian de sitio.`);
+        say(`${name(pick.fromId)} y ${name(pid)} cambian de sitio.`);
       }
       return setPick({ kind: "seat" });
     }
@@ -260,7 +270,7 @@ export function GamePage() {
         message = result.message;
         return pick.advance ? advanceAfterChoice(g, result.game, pid, pick.sourceId, pick.label, characters) : result.game;
       });
-      if (message) toast(message);
+      if (message) say(message);
       return setPick(null);
     }
     if (pick.kind === "exile") {
@@ -271,10 +281,8 @@ export function GamePage() {
       return setTab("phase");
     }
     if (pick.kind === "execute") {
+      // El registro dice si sobrevive (Abogado del diablo, Marinero, Bufón…) y el aviso lo repite.
       change((g) => rules.executeNow(g, pid, undefined, characters));
-      // El registro dice si sobrevive (Abogado del diablo, Marinero, Bufón…).
-      const logged = [...(gameRef.current?.log ?? [])].reverse().find((l) => l.text.startsWith(`${name(pid)} es ejecutado`));
-      toast(logged?.text ?? `${name(pid)} es ejecutado.`);
       setPick(null);
       return setTab("phase");
     }
@@ -287,7 +295,7 @@ export function GamePage() {
         message = result.message;
         return result.game;
       });
-      if (message) toast(message);
+      if (message) say(message);
       setPick(null);
       return setTab("phase");
     }
@@ -312,9 +320,9 @@ export function GamePage() {
         ? rules.executeNow(result.game, nominatorId, `${name(nominatorId)} nomina a la Virgen siendo Aldeano: es ejecutado en el acto.`, characters)
         : result.game;
     });
-    if (virgin.executes) toast(`${name(pid)} es la Virgen y ${name(nominatorId)} es Aldeano: ${name(nominatorId)} es ejecutado en el acto.`);
-    else if (virgin.spy) toast(`${name(pid)} es la Virgen y la nomina el Espía: si decides que se registra como Aldeano, usa «Ejecutar sin votación».`);
-    else if (died.length) toast(`${died.join(" y ")} muere al nominar (${rules.witchCursed(game, nominatorId) ? "maldición de la Bruja" : "Gólem"}).`);
+    if (virgin.executes) say(`${name(pid)} es la Virgen y ${name(nominatorId)} es Aldeano: ${name(nominatorId)} es ejecutado en el acto.`);
+    else if (virgin.spy) say(`${name(pid)} es la Virgen y la nomina el Espía: si decides que se registra como Aldeano, usa «Ejecutar sin votación».`);
+    else if (died.length) say(`${died.join(" y ")} muere al nominar (${rules.witchCursed(game, nominatorId) ? "maldición de la Bruja" : "Gólem"}).`);
     setPick(null);
     setTab("phase");
   };
@@ -587,6 +595,21 @@ export function GamePage() {
         </section>
       </div>
 
+      {quickPlayer && (
+        <QuickSheet
+          key={quickPlayer.id}
+          player={quickPlayer}
+          characters={characters}
+          newId={app.newId}
+          onChange={change}
+          onOpenSheet={() => {
+            setQuick(null);
+            setSelected(quickPlayer.id);
+          }}
+          onClose={() => setQuick(null)}
+        />
+      )}
+
       {player && (
         <PlayerSheet
           key={player.id}
@@ -638,7 +661,7 @@ export function GamePage() {
                 return result.game;
               });
               setPitHagTarget(null);
-              if (message) toast(message);
+              if (message) say(message);
             }}
           />
         </Sheet>

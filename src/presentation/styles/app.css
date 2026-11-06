@@ -1003,11 +1003,42 @@ button.token {
 /* ---------- Asistente de nueva partida ---------- */
 
 .steps {
-  display: flex;
+  display: none;
   gap: 6px;
   margin-bottom: 20px;
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+/* Cabecera del asistente en el móvil: «Paso 2 de 5 · Guion» y una barra. */
+.steps-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.steps-compact strong {
+  color: var(--text-strong);
+}
+
+.steps-compact__bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.steps-compact__bar > div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--gold));
+  transition: width 0.3s;
 }
 
 .steps::-webkit-scrollbar {
@@ -2551,6 +2582,88 @@ button.token {
   border-color: var(--blood-bright);
 }
 
+/* Aviso con botón dentro («Jugador 6 ha muerto · Deshacer»). */
+.toast--action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 8px;
+}
+
+.toast--action > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast__action {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  background: none;
+  color: var(--gold-bright);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* Mini-hoja de acciones rápidas al tocar una ficha. */
+.quick {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quick__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.quick__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.quick__who strong {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+
+.quick__head > .lucide {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* Resumen de la noche en el paso de Amanecer. */
+.dawn-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.log--compact {
+  font-size: 0.9rem;
+}
+
+.log--compact li {
+  padding: 4px 0;
+}
+
 /* ---------- Pantallas más grandes (mobile first: esto amplía) ---------- */
 
 @media (min-width: 640px) {
@@ -2560,6 +2673,14 @@ button.token {
 
   .label-wide {
     display: inline;
+  }
+
+  .steps {
+    display: flex;
+  }
+
+  .steps-compact {
+    display: none;
   }
 
   .page {

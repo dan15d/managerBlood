@@ -270,6 +270,15 @@ export function NewGamePage() {
 
   return (
     <main className="page page--flow">
+      {/* En el móvil, solo el paso en el que se está y una barra de progreso; la tira entera no cabe. */}
+      <div className="steps-compact" aria-hidden>
+        <span>
+          Paso {step + 1} de {STEPS.length} · <strong>{STEPS[step]}</strong>
+        </span>
+        <div className="steps-compact__bar">
+          <div style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
+        </div>
+      </div>
       <nav className="steps" aria-label="Pasos">
         {STEPS.map((label, i) => (
           <button

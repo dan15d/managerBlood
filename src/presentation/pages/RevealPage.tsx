@@ -30,9 +30,13 @@ export function RevealPage() {
     const secret = seatSecret(current, app.catalog.map(), game.fabledIds, publicAlive(game, current));
     const tor = hasFabled(game, TOR) && publicAlive(game, current);
     const character = secret.characterId ? app.catalog.get(secret.characterId) : undefined;
+    // Al devolver el móvil se pasa directo al siguiente que falte, en orden de asiento; sin volver a la lista.
+    const seenNow = [...new Set([...seen, current.id])];
+    const pending = game.players.filter((p) => !seenNow.includes(p.id));
+    const following = pending.find((p) => p.seat > current.seat) ?? pending[0] ?? null;
     const done = () => {
-      setSeen((s) => [...new Set([...s, current.id])]);
-      setCurrent(null);
+      setSeen(seenNow);
+      setCurrent(following);
       setRevealed(false);
     };
     return (
@@ -73,8 +77,13 @@ export function RevealPage() {
                 {character?.ability}
               </p>
               <button className="btn btn--gold" style={{ minHeight: 56, padding: "0 36px" }} onClick={done}>
-                Ocultar y devolver el móvil
+                {following ? `Ocultar y pasar a ${following.name}` : "Ocultar y devolver el móvil"}
               </button>
+              {following && (
+                <p className="muted small" style={{ margin: 0 }}>
+                  {seenNow.length} de {game.players.length} ya han visto el suyo.
+                </p>
+              )}
             </>
           )}
         </div>

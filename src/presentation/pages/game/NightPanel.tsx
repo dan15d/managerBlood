@@ -65,6 +65,8 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
   // Recordatorio de quien elige jugador cada noche (Envenenador, Monje, Demonio…).
   const chooser = step.character && step.playerIds.length > 0 ? choiceReminder(step.character.id, game.phase.number === 1) : undefined;
   const otherReminders = [...new Set(step.character?.reminders ?? [])].filter((label) => label !== chooser);
+  // Lo que el registro ha apuntado esta noche (sin la línea de «Cae la noche»), para el amanecer.
+  const nightLog = step.kind === "dawn" ? game.log.filter((l) => l.phase === rules.phaseLabel(game.phase) && !/^Cae la noche/.test(l.text)) : [];
 
   return (
     <div>
@@ -297,6 +299,17 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
 
         {step.kind === "dawn" && (
           <div className="stack" style={{ gap: 6 }}>
+            {/* Lo apuntado esta noche, para anunciar el amanecer sin abrir el registro. */}
+            {nightLog.length > 0 && (
+              <div className="dawn-summary">
+                <span className="small muted">Esta noche</span>
+                <ul className="log log--compact">
+                  {nightLog.map((l, i) => (
+                    <li key={i}>{l.text}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <span className="small muted">
               ¿Quién ha muerto esta noche? Los que ha matado el Demonio ya están marcados; toca para cambiarlo. Los móviles de los
               jugadores lo verán al empezar el día.
