@@ -78,7 +78,18 @@ export class SupabaseFunctionTransport implements ChatTransport {
     const { data, error } = await this.client.functions.invoke("ai-storyteller", {
       body: { model: this.model, messages, json: !!options?.json, temperature: options?.temperature },
     });
-    if (error) throw new Error(`La función de IA ha fallado: ${error.message}`);
+    if (error) throw new Error(`La función de IA ha fallado: ${await functionErrorMessage(error)}`);
     return extract(data);
   }
+}
+
+/**
+ * Si la función responde con error, supabase-js solo dice «non-2xx status code»: el motivo real
+ * (p. ej. «Solo el Narrador puede usar la IA.») viene en el cuerpo de la respuesta.
+ */
+async function functionErrorMessage(error: { message: string; context?: unknown }): Promise<string> {
+  const response = error.context;
+  if (!(response instanceof Response)) return error.message;
+  const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+  return body?.error?.message ?? error.message;
 }
