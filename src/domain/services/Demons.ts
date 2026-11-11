@@ -1,24 +1,22 @@
 import type { Character } from "../entities/Character";
 import type { Game, Player, ReminderToken } from "../entities/Game";
+import { APP_REMINDER, has, REMINDER } from "./Reminders";
 
 // Estado propio de algunos Demonios, guardado como recordatorios en el Grimorio (igual que en
 // el físico). Solo son consultas: las reglas que lo cambian están en GameRules.
 
+export { has, healthy } from "./Reminders";
+
 /** El Zombuul ya ha «muerto» una vez: parece muerto, pero sigue vivo. */
-export const ZOMBUUL_SEEMS_DEAD = "Parece muerto";
+export const ZOMBUUL_SEEMS_DEAD = APP_REMINDER.zombuulSeemsDead;
 /** El Zombuul ha muerto de verdad (la segunda vez). */
-export const ZOMBUUL_REALLY_DEAD = "Muerto de verdad";
+export const ZOMBUUL_REALLY_DEAD = APP_REMINDER.zombuulReallyDead;
 /** Quien cuida a Lil' Monsta (y «es el Demonio»). */
-export const LILMONSTA_BABYSITTER = "Es el Demonio";
+export const LILMONSTA_BABYSITTER = REMINDER.isDemon;
 /** El Leviatán ha visto ejecutar a este jugador bueno. */
-export const LEVIATHAN_GOOD_EXECUTED = "Bueno ejecutado";
+export const LEVIATHAN_GOOD_EXECUTED = REMINDER.goodExecuted;
 /** Se ha convertido en el Demonio de día (Mujer escarlata): esta noche hay que decírselo. */
-export const NEW_DEMON = "Nuevo Demonio";
-
-export const has = (p: Player, source: string, label: string) => p.reminders.some((r) => r.sourceCharacterId === source && r.label === label);
-
-/** Sin recordatorios que le quiten la habilidad (envenenado, borracho, sin habilidad). */
-export const healthy = (p: Player) => !p.reminders.some((r) => /envenen|borrach|sin habilidad/i.test(r.label));
+export const NEW_DEMON = APP_REMINDER.newDemon;
 
 /** Zombuul que parece muerto pero sigue vivo (para las reglas cuenta como vivo). */
 export const zombuulSeemsDead = (p: Player) =>
@@ -28,7 +26,7 @@ export const zombuulSeemsDead = (p: Player) =>
 export const reallyAlive = (p: Player) => p.alive || zombuulSeemsDead(p);
 
 /** El huésped del Lleech: el jugador que envenenó la primera noche. */
-export const lleechHost = (game: Game) => game.players.find((p) => has(p, "lleech", "Envenenado"));
+export const lleechHost = (game: Game) => game.players.find((p) => has(p, "lleech", REMINDER.poisoned));
 
 /** Lil' Monsta está en juego: no lo tiene ningún jugador, lo cuida un Esbirro. */
 export const hasLilMonsta = (game: Game) => (game.extraCharacterIds ?? []).includes("lilmonsta");

@@ -1,6 +1,7 @@
 import type { Character } from "../entities/Character";
 import type { Game, Player } from "../entities/Game";
 import { demonPlayers, NEW_DEMON } from "./Demons";
+import { healthy, REMINDER } from "./Reminders";
 import { buildNightOrder } from "./NightOrder";
 
 // La respuesta verdadera de los personajes de información, calculada con el Grimorio.
@@ -19,47 +20,47 @@ export interface InfoHint {
  * (Envenenador → «Envenenado», Monje → «A salvo», Demonios → «Muerto»…).
  */
 export const CHOICE_REMINDER: Record<string, string> = {
-  poisoner: "Envenenado",
-  monk: "A salvo",
+  poisoner: REMINDER.poisoned,
+  monk: REMINDER.safe,
   butler: "Señor",
-  innkeeper: "A salvo",
-  sailor: "Borracho",
+  innkeeper: REMINDER.safe,
+  sailor: REMINDER.drunk,
   exorcist: "Elegido",
-  moonchild: "Muerto",
+  moonchild: REMINDER.dead,
   devilsadvocate: "Sobrevive ejecución",
-  assassin: "Muerto",
-  godfather: "Muerto",
+  assassin: REMINDER.dead,
+  godfather: REMINDER.dead,
   witch: "Maldito",
-  cerenovus: "Loco",
-  harpy: "Loco",
-  widow: "Envenenado",
+  cerenovus: REMINDER.mad,
+  harpy: REMINDER.mad,
+  widow: REMINDER.poisoned,
   fearmonger: "Terror",
   acrobat: "Elegido",
-  preacher: "Sin habilidad",
-  professor: "Vivo",
-  courtier: "Borracho 1",
+  preacher: REMINDER.noAbility,
+  professor: REMINDER.alive,
+  courtier: REMINDER.drunk1,
   ogre: "Amigo",
   lunatic: "Elegido",
-  imp: "Muerto",
-  po: "Muerto",
-  pukka: "Envenenado",
-  shabaloth: "Muerto",
-  zombuul: "Muerto",
-  fanggu: "Muerto",
-  nodashii: "Muerto",
-  vigormortis: "Muerto",
-  vortox: "Muerto",
-  lleech: "Muerto",
-  ojo: "Muerto",
-  kazali: "Muerto",
-  lordoftyphon: "Muerto",
-  legion: "Muerto",
-  lilmonsta: "Es el Demonio",
-  yaggababble: "Muerto",
+  imp: REMINDER.dead,
+  po: REMINDER.dead,
+  pukka: REMINDER.poisoned,
+  shabaloth: REMINDER.dead,
+  zombuul: REMINDER.dead,
+  fanggu: REMINDER.dead,
+  nodashii: REMINDER.dead,
+  vigormortis: REMINDER.dead,
+  vortox: REMINDER.dead,
+  lleech: REMINDER.dead,
+  ojo: REMINDER.dead,
+  kazali: REMINDER.dead,
+  lordoftyphon: REMINDER.dead,
+  legion: REMINDER.dead,
+  lilmonsta: REMINDER.isDemon,
+  yaggababble: REMINDER.dead,
   alhadikhia: "1",
   bureaucrat: "3 votos",
   thief: "Voto negativo",
-  snakecharmer: "Envenenado",
+  snakecharmer: REMINDER.poisoned,
   // La Pit-Hag elige jugador y después el personaje en el que se convierte.
   pithag: "Elegido",
   // Eligen para recibir información: no ponen recordatorio, la app da la respuesta.
@@ -123,14 +124,14 @@ export function infoChoiceAnswer(game: Game, chooserCharacterId: string, target:
   }[chooserCharacterId as "dreamer" | "ravenkeeper" | "villageidiot" | "gambler"];
   const chooser = characters.get(chooserCharacterId);
   const notes = chooser ? commonCaveats(game, characters, chooser) : [];
-  const working = game.players.some((p) => p.characterId === chooserCharacterId && !p.reminders.some((r) => /envenen|borrach|sin habilidad/i.test(r.label)));
+  const working = game.players.some((p) => p.characterId === chooserCharacterId && healthy(p));
   if (!working) notes.unshift("Quien elige no tiene habilidad (Borracho, envenenado…): puedes darle información falsa.");
   return [answer, ...notes].join(" ");
 }
 
 /** Lo que pone quien elige esta noche: el Lleech, la primera noche, envenena a su huésped. */
 export const choiceReminder = (characterId: string, firstNight: boolean): string | undefined =>
-  characterId === "lleech" && firstNight ? "Envenenado" : ["godfather", "pithag"].includes(characterId) && firstNight ? undefined : CHOICE_REMINDER[characterId];
+  characterId === "lleech" && firstNight ? REMINDER.poisoned : ["godfather", "pithag"].includes(characterId) && firstNight ? undefined : CHOICE_REMINDER[characterId];
 
 const label = (p: Player, characters: Map<string, Character>) => `${p.seat + 1}. ${p.name} (${characters.get(p.characterId)?.name ?? "?"})`;
 
@@ -328,7 +329,7 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
       }
       case "choirboy": {
         const king = game.players.find((p) => p.characterId === "king");
-        const killedByDemon = king && (game.nightDeaths ?? []).includes(king.id) && king.reminders.some((r) => r.label === "Muerto" && characters.get(r.sourceCharacterId)?.team === "demon");
+        const killedByDemon = king && (game.nightDeaths ?? []).includes(king.id) && king.reminders.some((r) => r.label === REMINDER.dead && characters.get(r.sourceCharacterId)?.team === "demon");
         return killedByDemon ? `El Demonio ha matado al Rey: señala al Demonio (${demons.map((p) => p.name).join(", ")}).` : "El Demonio no ha matado al Rey esta noche: no le despiertes.";
       }
       case "bountyhunter": {

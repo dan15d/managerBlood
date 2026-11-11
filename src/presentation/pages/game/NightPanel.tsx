@@ -14,6 +14,7 @@ import { Token } from "../../components/Token";
 import { NIGHT_ICONS } from "../../wikiAssets";
 import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, Lightbulb, Pointer, Skull, Sun, TriangleAlert, VenetianMask } from "lucide-react";
 import { choiceReminder, CHOICE_WITHOUT_REMINDER, infoHints } from "@domain/services/NightInfo";
+import { disablesAbility } from "@domain/services/Reminders";
 
 interface Props {
   game: Game;
@@ -32,9 +33,6 @@ interface Card {
   heading?: string;
   characters: Character[];
 }
-
-/** Recordatorios que dejan sin habilidad: hay que avisar al Narrador para que dé información falsa. */
-const DISABLING = /envenen|borrach|sin habilidad|loc[oa]|enloquec/i;
 
 /** Icono del paso: la ficha del personaje o el de la hoja de noche (crepúsculo, Esbirros…). */
 export function StepIcon({ step, size }: { step: NightStep; size: number }) {
@@ -58,7 +56,7 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
   const player = (id: string) => game.players.find((p) => p.id === id)!;
   const last = index === steps.length - 1;
   // Jugadores de este paso con un recordatorio que les quita la habilidad (envenenado, borracho…).
-  const disabled = step.playerIds.map(player).filter((p) => p.reminders.some((r) => DISABLING.test(r.label)));
+  const disabled = step.playerIds.map(player).filter((p) => p.reminders.some(disablesAbility));
   const hints = step.character ? infoHints(game, step.character, characters) : [];
   // El Exorcista o la Princesa impiden que el Demonio mate esta noche.
   const demonBlock = step.character?.team === "demon" ? rules.demonBlocked(game, step.character.id) : null;
@@ -104,7 +102,7 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
                     <span className="chips">
                       {p.shownCharacterId && <span className="chip chip--static chip--reminder chip--tiny">Cree ser {characters.get(p.shownCharacterId)?.name}</span>}
                       {p.reminders.map((r) => (
-                        <span key={r.id} className={`chip chip--static chip--reminder chip--tiny ${DISABLING.test(r.label) ? "chip--danger" : ""}`}>
+                        <span key={r.id} className={`chip chip--static chip--reminder chip--tiny ${disablesAbility(r) ? "chip--danger" : ""}`}>
                           {r.label}
                         </span>
                       ))}
@@ -119,7 +117,7 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
           <div className="note note--warning">
             <TriangleAlert />
             <span>
-              {disabled.map((p) => `${p.name} (${p.reminders.filter((r) => DISABLING.test(r.label)).map((r) => r.label.toLowerCase()).join(", ")})`).join("; ")}
+              {disabled.map((p) => `${p.name} (${p.reminders.filter((r) => disablesAbility(r)).map((r) => r.label.toLowerCase()).join(", ")})`).join("; ")}
               : sin habilidad esta noche. Despiértalo igual y dale información falsa si te conviene.
             </span>
           </div>

@@ -1,6 +1,7 @@
 import type { Character } from "../entities/Character";
 import type { Game, Player } from "../entities/Game";
 import { has, hasLilMonsta, healthy, reallyAlive } from "./Demons";
+import { REMINDER } from "./Reminders";
 import { TOR, TOYMAKER } from "./SpecialRules";
 
 export type NightStepKind = "dusk" | "minion_info" | "demon_info" | "character" | "dawn";
@@ -37,7 +38,7 @@ function deathNote(game: Game, characterId: string, players: Player[]): NightSte
   if (characterId === "moonchild") {
     const dead = players.filter((p) => !p.alive);
     if (!dead.length) return { wake: false, text: "Solo actúa cuando muere. Ahora no hay nada que hacer." };
-    return dead.some((p) => !has(p, "moonchild", "Sin habilidad"))
+    return dead.some((p) => !has(p, "moonchild", REMINDER.noAbility))
       ? { wake: true, text: "Ha muerto: si ya ha elegido a alguien en público, toca a quién (si es bueno, muere)." }
       : { wake: false, text: "Ya usó su habilidad." };
   }
@@ -168,7 +169,7 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
         character: c,
         // Los que actúan al morir se saltan si no les toca, aunque estén vivos.
         // El Esbirro muerto por el Vigormortis conserva su habilidad.
-        dead: note ? !note.wake : players.length > 0 && players.every((p) => !reallyAlive(p) && !has(p, "vigormortis", "Tiene habilidad")),
+        dead: note ? !note.wake : players.length > 0 && players.every((p) => !reallyAlive(p) && !has(p, "vigormortis", REMINDER.hasAbility)),
         deathNote: note,
       },
     });

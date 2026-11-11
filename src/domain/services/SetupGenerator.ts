@@ -1,6 +1,7 @@
 import { isGoodTeam, type Character, type Team } from "../entities/Character";
 import type { Player } from "../entities/Game";
 import { pick, shuffle, type RandomFn } from "./Random";
+import { REMINDER } from "./Reminders";
 import {
   allowedDistributions,
   baseDistribution,
@@ -138,7 +139,7 @@ export function applySetupEffects(
   if (idiots.length > 1) {
     const drunk = pick(idiots, random)!;
     result = result.map((p) =>
-      p.id === drunk.id ? { ...p, reminders: [...p.reminders, { id: newId(), sourceCharacterId: "villageidiot", label: "Borracho" }] } : p,
+      p.id === drunk.id ? { ...p, reminders: [...p.reminders, { id: newId(), sourceCharacterId: "villageidiot", label: REMINDER.drunk }] } : p,
     );
     log.push(`${drunk.name} es el Tonto del pueblo borracho.`);
   }
@@ -147,7 +148,7 @@ export function applySetupEffects(
     const poisoned = nearestTownsfolk(result, demon, characters);
     const ids = new Set(poisoned.map((p) => p.id));
     result = result.map((p) =>
-      ids.has(p.id) ? { ...p, reminders: [...p.reminders, { id: newId(), sourceCharacterId: "nodashii", label: "Envenenado" }] } : p,
+      ids.has(p.id) ? { ...p, reminders: [...p.reminders, { id: newId(), sourceCharacterId: "nodashii", label: REMINDER.poisoned }] } : p,
     );
     if (poisoned.length) log.push(`${poisoned.map((p) => p.name).join(" y ")}: envenenados por el No Dashii (Aldeanos vecinos).`);
   }
