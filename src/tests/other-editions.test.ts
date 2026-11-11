@@ -5,6 +5,7 @@ import * as rules from "@domain/services/GameRules";
 import { buildNightOrder } from "@domain/services/NightOrder";
 import { seededRandom } from "@domain/services/Random";
 import { applySetupEffects } from "@domain/services/SetupGenerator";
+import { NEW_GAME } from "./gameFixture";
 
 // Personajes de otras ediciones que cambian quién gana, quién muere, cómo se vota o qué se sabe.
 
@@ -23,6 +24,7 @@ function game(ids: string[], extra: Partial<Game> = {}): Game {
     reminders: [],
   }));
   return {
+    ...NEW_GAME,
     id: "g",
     name: "Prueba",
     mode: "manual",

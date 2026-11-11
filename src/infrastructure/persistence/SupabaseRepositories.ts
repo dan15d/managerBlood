@@ -2,7 +2,8 @@ import { GameConflictError, type GameRepository, type GameSummary } from "@appli
 import type { Unsubscribe } from "@application/ports/TableGateway";
 import type { CustomScriptRepository } from "@application/ports/ScriptRepository";
 import { summarize } from "@application/use-cases/GameUseCases";
-import type { Game } from "@domain/entities/Game";
+import type { Game, StoredGame } from "@domain/entities/Game";
+import { upgradeGame } from "@domain/services/GameSchema";
 import type { Script } from "@domain/entities/Script";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -59,7 +60,8 @@ export class SupabaseGameRepository implements GameRepository {
     await ownerId(this.client);
     const { data, error } = await this.client.from("games").select("data").eq("id", id).maybeSingle();
     fail("leer la partida", error);
-    return (data?.data as Game) ?? null;
+    const stored = data?.data as StoredGame | undefined;
+    return stored ? upgradeGame(stored) : null;
   }
 
   async save(game: Game, expectUpdatedAt?: string) {

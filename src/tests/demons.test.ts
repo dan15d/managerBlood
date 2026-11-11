@@ -8,6 +8,7 @@ import { seededRandom } from "@domain/services/Random";
 import { applySetupEffects, randomSelection } from "@domain/services/SetupGenerator";
 import { allowedDistributions, validateSelection } from "@domain/services/SetupRules";
 import { publicPlayers } from "@domain/services/TableView";
+import { NEW_GAME } from "./gameFixture";
 
 // Demonios cuyas reglas cambian quién muere, quién gana o cómo se prepara la partida.
 
@@ -28,6 +29,7 @@ function game(ids: string[], extra: Partial<Game> = {}): Game {
     reminders: [],
   }));
   return {
+    ...NEW_GAME,
     id: "g",
     name: "Prueba",
     mode: "manual",

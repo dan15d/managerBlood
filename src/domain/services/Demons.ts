@@ -29,7 +29,7 @@ export const reallyAlive = (p: Player) => p.alive || zombuulSeemsDead(p);
 export const lleechHost = (game: Game) => game.players.find((p) => has(p, "lleech", REMINDER.poisoned));
 
 /** Lil' Monsta está en juego: no lo tiene ningún jugador, lo cuida un Esbirro. */
-export const hasLilMonsta = (game: Game) => (game.extraCharacterIds ?? []).includes("lilmonsta");
+export const hasLilMonsta = (game: Game) => game.extraCharacterIds.includes("lilmonsta");
 
 export const lilMonstaBabysitter = (game: Game) => game.players.find((p) => has(p, "lilmonsta", LILMONSTA_BABYSITTER));
 

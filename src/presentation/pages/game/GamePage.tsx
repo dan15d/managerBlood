@@ -1,4 +1,4 @@
-import { GameConflictError } from "@application/ports/GameRepository";
+import { GameConflictError, GameNotFoundError } from "@application/ports/GameRepository";
 import { SaveQueue } from "@application/use-cases/SaveQueue";
 import type { Character } from "@domain/entities/Character";
 import type { Game } from "@domain/entities/Game";
@@ -129,8 +129,13 @@ export function GamePage() {
         } catch (e) {
           if (!(e instanceof GameConflictError)) throw e;
           // Otro dispositivo guardó antes: manda su versión y lo que había en cola aquí se descarta.
+          // Solo si ya no existe se da por borrada; si no se puede leer (sin cobertura…), se avisa y se reintenta.
+          const remote = await app.loadGame.execute(g.id).catch((err) => {
+            if (err instanceof GameNotFoundError) return null;
+            throw err;
+          });
           queue.discard();
-          adopt(await app.loadGame.execute(g.id).catch(() => null));
+          adopt(remote);
         }
       },
       {

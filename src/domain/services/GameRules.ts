@@ -49,9 +49,9 @@ export const alivePlayers = (game: Game) => game.players.filter((p) => p.alive);
  * había resucitado esta misma noche, para la mesa nunca dejó de estar muerto.
  */
 const recordDeath = (game: Game, playerId: string): Game => {
-  if (game.phase.kind !== "night") return { ...game, dayDeaths: [...(game.dayDeaths ?? []), playerId] };
-  if (game.nightRevivals?.includes(playerId)) return { ...game, nightRevivals: game.nightRevivals.filter((id) => id !== playerId) };
-  return { ...game, nightDeaths: [...(game.nightDeaths ?? []), playerId] };
+  if (game.phase.kind !== "night") return { ...game, dayDeaths: [...game.dayDeaths, playerId] };
+  if (game.nightRevivals.includes(playerId)) return { ...game, nightRevivals: game.nightRevivals.filter((id) => id !== playerId) };
+  return { ...game, nightDeaths: [...game.nightDeaths, playerId] };
 };
 
 const withReminder = (game: Game, playerId: string, source: string, label: string): Game =>
@@ -103,7 +103,7 @@ export function revivePlayer(game: Game, playerId: string): Game {
   const player = findPlayer(game, playerId);
   if (!player || player.alive) return game;
   const night = game.phase.kind === "night";
-  const diedTonight = (game.nightDeaths ?? []).includes(playerId);
+  const diedTonight = game.nightDeaths.includes(playerId);
   const hidden = night && !diedTonight;
   const alive = updatePlayer(game, playerId, (p) => ({
     ...p,
@@ -115,9 +115,9 @@ export function revivePlayer(game: Game, playerId: string): Game {
   return touch(
     {
       ...alive,
-      nightDeaths: game.nightDeaths?.filter((id) => id !== playerId),
-      dayDeaths: game.dayDeaths?.filter((id) => id !== playerId),
-      nightRevivals: hidden ? [...(game.nightRevivals ?? []), playerId] : game.nightRevivals,
+      nightDeaths: game.nightDeaths.filter((id) => id !== playerId),
+      dayDeaths: game.dayDeaths.filter((id) => id !== playerId),
+      nightRevivals: hidden ? [...game.nightRevivals, playerId] : game.nightRevivals,
     },
     `${player.name} vuelve a la vida${hidden ? " (la mesa lo sabrá al amanecer)" : ""}.`,
   );
@@ -334,8 +334,8 @@ export function swapSeats(game: Game, a: string, b: string): Game {
 /** Amanece: se anuncian las muertes de la noche (desde ahora la mesa las ve). */
 export function startDay(game: Game): Game {
   if (game.phase.kind !== "night") throw new RuleViolation("Ya es de día.");
-  const died = (game.nightDeaths ?? []).map((id) => findPlayer(game, id)?.name).filter(Boolean);
-  const revived = game.nightRevivals ?? [];
+  const died = game.nightDeaths.map((id) => findPlayer(game, id)?.name).filter(Boolean);
+  const revived = game.nightRevivals;
   const next = {
     ...game,
     phase: { kind: "day", number: game.phase.number } as Phase,
@@ -399,7 +399,7 @@ export const setBluffs = (game: Game, bluffs: string[]): Game => touch({ ...game
 /** El Narrador pone o quita una Fábula o un Lórico (y lo anuncia a la mesa). */
 export function toggleFabled(game: Game, character: Character): Game {
   if (character.team !== "fabled" && character.team !== "loric") throw new RuleViolation(`${character.name} no es una Fábula ni un Lórico.`);
-  const current = game.fabledIds ?? [];
+  const current = game.fabledIds;
   const on = current.includes(character.id);
   return touch(
     { ...game, fabledIds: on ? current.filter((id) => id !== character.id) : [...current, character.id] },

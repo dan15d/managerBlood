@@ -3,6 +3,7 @@ import { StaticCharacterCatalog } from "@infrastructure/catalog/StaticCatalog";
 import type { Game, Player } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { buildNightOrder } from "@domain/services/NightOrder";
+import { NEW_GAME } from "./gameFixture";
 
 // Intercambios de personaje: el Encantador de serpientes (con bando) y el Barbero (sin bando).
 
@@ -21,6 +22,7 @@ function game(ids: string[]): Game {
     reminders: [],
   }));
   return {
+    ...NEW_GAME,
     id: "g",
     name: "Prueba",
     mode: "manual",

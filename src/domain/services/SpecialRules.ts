@@ -35,13 +35,13 @@ export function defaultFabled(scriptCharacters: Character[], jinxes: Jinx[]): st
   return [...new Set([...own, ...djinn])];
 }
 
-export const hasFabled = (game: Pick<Game, "fabledIds">, id: string) => (game.fabledIds ?? []).includes(id);
+export const hasFabled = (game: Pick<Game, "fabledIds">, id: string) => game.fabledIds.includes(id);
 
 /** Personajes del Grimorio (de jugadores, los que creen ser y las Fábulas), para buscar incompatibilidades. */
 export const gameCharacterIds = (game: Game) => [
   ...new Set([
     ...game.players.flatMap((p) => [p.characterId, p.shownCharacterId].filter((id): id is string => !!id)),
-    ...(game.fabledIds ?? []),
-    ...(game.extraCharacterIds ?? []),
+    ...game.fabledIds,
+    ...game.extraCharacterIds,
   ]),
 ];

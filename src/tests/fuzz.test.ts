@@ -11,6 +11,7 @@ import { pick, seededRandom, type RandomFn } from "@domain/services/Random";
 import { applySetupEffects, pickBluffs, pickDecoys, randomSelection, seatMarionette } from "@domain/services/SetupGenerator";
 import { isDealt } from "@domain/services/SetupRules";
 import { publicPlayers, seatSecret } from "@domain/services/TableView";
+import { NEW_GAME } from "./gameFixture";
 
 // Partidas al azar de principio a fin: el Narrador sigue la hoja de noche, los jugadores nominan
 // y votan al azar. En cada paso se comprueba que las reglas no se contradicen ni se rompen.
@@ -59,6 +60,7 @@ function setUp(pool: Character[], playerCount: number, random: RandomFn): Game |
   let n = 0;
   players = applySetupEffects(players, map, random, () => `s${n++}`).players;
   return {
+    ...NEW_GAME,
     id: "g",
     name: "Fuzz",
     mode: "manual",

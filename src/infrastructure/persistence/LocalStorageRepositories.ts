@@ -2,7 +2,8 @@ import { GameConflictError, type GameRepository } from "@application/ports/GameR
 import type { CustomScriptRepository } from "@application/ports/ScriptRepository";
 import type { AdminAuth, TablePublisher } from "@application/ports/TableGateway";
 import { summarize } from "@application/use-cases/GameUseCases";
-import type { Game } from "@domain/entities/Game";
+import type { Game, StoredGame } from "@domain/entities/Game";
+import { upgradeGame } from "@domain/services/GameSchema";
 import type { Script } from "@domain/entities/Script";
 
 // Guardado en el navegador: la app funciona sin cuenta ni conexión. Si el navegador no deja
@@ -33,14 +34,15 @@ class JsonStore<T extends { id: string }> {
 }
 
 export class LocalStorageGameRepository implements GameRepository {
-  private readonly store = new JsonStore<Game>("grimorio.games");
+  private readonly store = new JsonStore<StoredGame>("grimorio.games");
 
   async list() {
     return Object.values(this.store.read()).map(summarize);
   }
 
-  async get(id: string) {
-    return this.store.read()[id] ?? null;
+  async get(id: string): Promise<Game | null> {
+    const stored = this.store.read()[id];
+    return stored ? upgradeGame(stored) : null;
   }
 
   async save(game: Game, expectUpdatedAt?: string) {
@@ -57,7 +59,11 @@ export class LocalStorageGameRepository implements GameRepository {
   /** Otra pestaña del mismo navegador: el navegador avisa cuando cambia lo guardado. */
   watch(id: string, onChange: (game: Game | null) => void) {
     if (typeof window === "undefined") return () => undefined;
-    const listener = (e: StorageEvent) => e.key === this.store.key && onChange(this.store.read()[id] ?? null);
+    const listener = (e: StorageEvent) => {
+      if (e.key !== this.store.key) return;
+      // Si no se puede leer (guardada por una versión más nueva de la app), se ignora: al guardar saldrá el aviso.
+      this.get(id).then(onChange, () => undefined);
+    };
     window.addEventListener("storage", listener);
     return () => window.removeEventListener("storage", listener);
   }

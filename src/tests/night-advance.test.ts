@@ -4,6 +4,7 @@ import type { Game, Player } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { advanceAfterChoice } from "@domain/services/NightInfo";
 import { buildNightOrder } from "@domain/services/NightOrder";
+import { NEW_GAME } from "./gameFixture";
 
 // La hoja de noche pasa sola al siguiente paso cuando elegir jugador era la acción principal.
 
@@ -22,6 +23,7 @@ function game(ids: string[], night = 2): Game {
     reminders: [],
   }));
   return {
+    ...NEW_GAME,
     id: "g",
     name: "Prueba",
     mode: "manual",

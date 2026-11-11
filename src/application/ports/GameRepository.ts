@@ -19,6 +19,14 @@ export class GameConflictError extends Error {
   }
 }
 
+/** No hay ninguna partida con ese id (o se ha borrado). */
+export class GameNotFoundError extends Error {
+  constructor() {
+    super("No encuentro esa partida.");
+    this.name = "GameNotFoundError";
+  }
+}
+
 export interface GameRepository {
   list(): Promise<GameSummary[]>;
   get(id: string): Promise<Game | null>;

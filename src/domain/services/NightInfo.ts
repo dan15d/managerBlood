@@ -238,7 +238,7 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
         const executed = game.players.find((p) => p.id === game.executedToday);
         if (!executed) return "Hoy no ha habido ejecución: no le despiertes.";
         // Solo aprende al que ha muerto por la ejecución (no al Marinero o al Bufón que sobreviven).
-        if (!(game.dayDeaths ?? []).includes(executed.id)) return `${executed.name} fue ejecutado pero no murió: no le despiertes.`;
+        if (!game.dayDeaths.includes(executed.id)) return `${executed.name} fue ejecutado pero no murió: no le despiertes.`;
         return `Enséñale ${characters.get(executed.characterId)?.name} (ejecutado: ${executed.name}).`;
       }
       case "fortuneteller": {
@@ -316,7 +316,7 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
       }
       case "sage": {
         // Solo si el Demonio le ha matado esta noche (el paso ya dice si toca despertarle).
-        if (!(game.nightDeaths ?? []).includes(self.id)) return null;
+        if (!game.nightDeaths.includes(self.id)) return null;
         return `Señala al Demonio (${demons.map((p) => p.name).join(" o ")}) y a otro jugador.`;
       }
       case "king": {
@@ -329,7 +329,7 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
       }
       case "choirboy": {
         const king = game.players.find((p) => p.characterId === "king");
-        const killedByDemon = king && (game.nightDeaths ?? []).includes(king.id) && king.reminders.some((r) => r.label === REMINDER.dead && characters.get(r.sourceCharacterId)?.team === "demon");
+        const killedByDemon = king && game.nightDeaths.includes(king.id) && king.reminders.some((r) => r.label === REMINDER.dead && characters.get(r.sourceCharacterId)?.team === "demon");
         return killedByDemon ? `El Demonio ha matado al Rey: señala al Demonio (${demons.map((p) => p.name).join(", ")}).` : "El Demonio no ha matado al Rey esta noche: no le despiertes.";
       }
       case "bountyhunter": {
@@ -337,7 +337,7 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
         const evil = game.players.filter((p) => p.alive && p.alignment === "evil" && p.id !== known?.id);
         if (!known) return `Falta poner «Conocido» en un jugador malo: ${list(evil)}.`;
         if (game.phase.number === 1 && game.phase.kind === "night") return `Señala a ${known.name}.`;
-        const diedRecently = [...(game.nightDeaths ?? []), ...(game.dayDeaths ?? [])].includes(known.id);
+        const diedRecently = [...game.nightDeaths, ...game.dayDeaths].includes(known.id);
         return diedRecently ? `Ha muerto ${known.name}: mueve «Conocido» y señala a otro malo (${list(evil)}).` : "Su jugador conocido sigue vivo: no le despiertes.";
       }
       case "godfather":
@@ -347,7 +347,7 @@ export function infoHints(game: Game, character: Character, characters: Map<stri
         return `Despierta al Demonio y señálale a la Marioneta: ${self.name}.`;
       case "zombuul": {
         // Solo ataca si nadie ha muerto durante el día (también cuenta su propia muerte aparente).
-        const died = (game.dayDeaths ?? []).map((id) => game.players.find((p) => p.id === id)?.name).filter(Boolean);
+        const died = game.dayDeaths.map((id) => game.players.find((p) => p.id === id)?.name).filter(Boolean);
         return died.length ? `Hoy ha muerto ${died.join(", ")}: no despiertes al Zombuul.` : "Hoy no ha muerto nadie: despierta al Zombuul para que elija.";
       }
       default:

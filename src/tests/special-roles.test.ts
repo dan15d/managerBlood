@@ -3,6 +3,7 @@ import { StaticCharacterCatalog } from "@infrastructure/catalog/StaticCatalog";
 import type { Game, Player } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { buildNightOrder } from "@domain/services/NightOrder";
+import { NEW_GAME } from "./gameFixture";
 
 // Personajes de Trouble Brewing (y otros) que cambian quién gana, cómo se vota o quién se despierta.
 
@@ -21,6 +22,7 @@ function game(ids: string[], extra: Partial<Game> = {}): Game {
     reminders: [],
   }));
   return {
+    ...NEW_GAME,
     id: "g",
     name: "Prueba",
     mode: "manual",

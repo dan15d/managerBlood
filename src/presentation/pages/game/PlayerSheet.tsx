@@ -41,7 +41,7 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
   // Borracho, Lunático y Marioneta: qué tipo de personaje creen ser.
   const decoyTeam = DECOYS[player.characterId];
 
-  const inPlay = [...new Set([...game.players.flatMap((p) => [p.characterId, p.shownCharacterId].filter(Boolean) as string[]), ...(game.fabledIds ?? [])])]
+  const inPlay = [...new Set([...game.players.flatMap((p) => [p.characterId, p.shownCharacterId].filter(Boolean) as string[]), ...game.fabledIds])]
     .map((id) => characters.get(id))
     .filter((c): c is Character => !!c && c.reminders.length > 0)
     .sort((a, b) => TEAM_ORDER.indexOf(a.team) - TEAM_ORDER.indexOf(b.team));

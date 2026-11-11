@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Game } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
+import { NEW_GAME } from "./gameFixture";
 
 // Cronómetro de la fase, cuenta atrás y apunte de la información dada.
 
 const game = (extra: Partial<Game> = {}): Game => ({
+  ...NEW_GAME,
   id: "g",
   name: "Prueba",
   mode: "manual",

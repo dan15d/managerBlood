@@ -31,7 +31,7 @@ interface Props {
 export function FabledBar({ game, characters, jinxes, onChange, onPickReminder, adding, onAddingChange }: Props) {
   const [open, setOpen] = useState<Character | null>(null);
   const [showing, setShowing] = useState(false);
-  const inPlay = (game.fabledIds ?? []).map((id) => characters.get(id)).filter((c): c is Character => !!c);
+  const inPlay = game.fabledIds.map((id) => characters.get(id)).filter((c): c is Character => !!c);
   const all = [...characters.values()].filter((c) => isStorytellerTeam(c.team));
   const gameJinxes = jinxesAmong(gameCharacterIds(game), jinxes);
   const jinxWarning = gameJinxes.length > 0 && !inPlay.some((c) => c.id === DJINN);
@@ -65,7 +65,7 @@ export function FabledBar({ game, characters, jinxes, onChange, onPickReminder, 
           <CharacterPicker
             characters={all}
             teams={["fabled", "loric"]}
-            selected={game.fabledIds ?? []}
+            selected={game.fabledIds}
             onToggle={(id) => {
               const c = characters.get(id);
               if (c) onChange((g) => rules.toggleFabled(g, c));
@@ -120,7 +120,7 @@ export function FabledBar({ game, characters, jinxes, onChange, onPickReminder, 
             <button className="btn" onClick={() => setShowing(true)}>
               <Eye /> Enseñar
             </button>
-            {(game.fabledIds ?? []).includes(open.id) ? (
+            {game.fabledIds.includes(open.id) ? (
               <button
                 className="btn btn--ghost"
                 onClick={() => {

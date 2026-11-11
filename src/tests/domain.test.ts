@@ -9,6 +9,7 @@ import { applySetupEffects, pickBluffs, pickDecoys, randomSelection, seatMarione
 import { defaultFabled, jinxesAmong } from "@domain/services/SpecialRules";
 import { publicPlayers, seatSecret } from "@domain/services/TableView";
 import { allowedDistributions, baseDistribution, maxTravellers, travellerSeats, validateSelection } from "@domain/services/SetupRules";
+import { NEW_GAME } from "./gameFixture";
 
 const catalog = new StaticCharacterCatalog();
 const scripts = new StaticOfficialScripts().list();
@@ -27,6 +28,7 @@ function game(ids: string[], extra: Partial<Game> = {}): Game {
     reminders: [],
   }));
   return {
+    ...NEW_GAME,
     id: "g",
     name: "Prueba",
     mode: "manual",

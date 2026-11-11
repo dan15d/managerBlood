@@ -186,7 +186,7 @@ export class SupabaseTablePublisher implements TablePublisher {
       phase_label: publicPhase(game),
       winner: game.winner ?? null,
       players: publicPlayers(game, characters),
-      fabled_ids: game.fabledIds ?? [],
+      fabled_ids: game.fabledIds,
       timer_ends_at: game.timer?.endsAt ?? null,
     };
     const seats = game.players.map((p) => {

@@ -5,6 +5,7 @@ import * as rules from "@domain/services/GameRules";
 import { infoHints } from "@domain/services/NightInfo";
 import { buildNightOrder, keepNightStep } from "@domain/services/NightOrder";
 import { publicPlayers, seatSecret } from "@domain/services/TableView";
+import { NEW_GAME } from "./gameFixture";
 
 // Fallos de la narración: protecciones que no deberían valer, la hoja de noche que salta de paso,
 // lo que ve el móvil de noche y avisos que no cuadraban.
@@ -24,6 +25,7 @@ function game(ids: string[], extra: Partial<Game> = {}): Game {
     reminders: [],
   }));
   return {
+    ...NEW_GAME,
     id: "g",
     name: "Prueba",
     mode: "manual",

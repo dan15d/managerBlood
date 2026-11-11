@@ -30,7 +30,7 @@ export function seatSecret(
  * quien ha resucitado esta noche sigue muerto hasta entonces.
  */
 export const publicAlive = (game: Game, player: Player) =>
-  (player.alive && !(game.nightRevivals ?? []).includes(player.id)) || (game.nightDeaths ?? []).includes(player.id);
+  (player.alive && !game.nightRevivals.includes(player.id)) || game.nightDeaths.includes(player.id);
 
 export const publicPlayers = (game: Game, characters: Map<string, Character>): PublicPlayer[] =>
   game.players.map((p) => ({

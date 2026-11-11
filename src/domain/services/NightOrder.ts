@@ -28,7 +28,7 @@ const ACT_IF_DIED_TONIGHT = new Set(["ravenkeeper", "sage", "farmer", "banshee"]
 const ACT_IF_DIED_RECENTLY = new Set(["sweetheart", "barber", "plaguedoctor"]);
 
 function deathNote(game: Game, characterId: string, players: Player[]): NightStep["deathNote"] {
-  const tonight = players.some((p) => (game.nightDeaths ?? []).includes(p.id));
+  const tonight = players.some((p) => game.nightDeaths.includes(p.id));
   if (ACT_IF_DIED_TONIGHT.has(characterId)) {
     return tonight
       ? { wake: true, text: "Ha muerto esta noche: despiértalo para que use su habilidad." }
@@ -43,7 +43,7 @@ function deathNote(game: Game, characterId: string, players: Player[]): NightSte
       : { wake: false, text: "Ya usó su habilidad." };
   }
   if (ACT_IF_DIED_RECENTLY.has(characterId)) {
-    const recently = tonight || players.some((p) => (game.dayDeaths ?? []).includes(p.id));
+    const recently = tonight || players.some((p) => game.dayDeaths.includes(p.id));
     return recently
       ? { wake: true, text: "Ha muerto hoy o esta noche: su habilidad se activa ahora (si no lo has hecho ya)." }
       : { wake: false, text: "Solo actúa cuando muere. Ahora no hay nada que hacer." };
@@ -103,7 +103,7 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
   // Cultivador de opio: mientras viva sano, los malos no se conocen; la noche en que muere, sí.
   const poppies = game.players.filter((p) => p.characterId === "poppygrower");
   const poppyBlocks = poppies.some((p) => p.alive && healthy(p));
-  const poppyDied = poppies.some((p) => [...(game.nightDeaths ?? []), ...(game.dayDeaths ?? [])].includes(p.id));
+  const poppyDied = poppies.some((p) => [...game.nightDeaths, ...game.dayDeaths].includes(p.id));
   const poppyOrder = characters.get("poppygrower")?.otherNight ?? 0;
 
   // Con Lil' Monsta no hay información de Esbirros ni de Demonio: se conocen en su paso.
@@ -147,7 +147,7 @@ export function buildNightOrder(game: Game, characters: Map<string, Character>):
     if (p.shownCharacterId && p.characterId !== "lunatic") add(p.shownCharacterId, p);
   }
   // Las Fábulas y Lóricos no son jugadores: su paso lo hace el Narrador (anunciar, poner recordatorios…).
-  for (const id of game.fabledIds ?? []) if (!byCharacter.has(id)) byCharacter.set(id, []);
+  for (const id of game.fabledIds) if (!byCharacter.has(id)) byCharacter.set(id, []);
   // Lil' Monsta no lo tiene nadie: en su paso despiertan los Esbirros para elegir quién lo cuida.
   if (hasLilMonsta(game)) byCharacter.set("lilmonsta", game.players.filter((p) => team(p) === "minion"));
   for (const [id, players] of byCharacter) {

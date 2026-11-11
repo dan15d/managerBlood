@@ -154,7 +154,7 @@ Responde SOLO con un objeto JSON: {"name": "nombre evocador en español", "descr
 Grimorio (en orden de asiento, en sentido horario):
 ${grimoire}
 Faroles del Demonio: ${game.demonBluffs.map(name).join(", ") || "ninguno"}
-Fábulas y Lóricos en juego: ${(game.fabledIds ?? []).map((id) => `${name(id)} (${characters.get(id)?.ability ?? ""})`).join("; ") || "ninguno"}
+Fábulas y Lóricos en juego: ${game.fabledIds.map((id) => `${name(id)} (${characters.get(id)?.ability ?? ""})`).join("; ") || "ninguno"}
 Incompatibilidades (jinxes) en juego: ${jinxes.map((j) => `${name(j.characterIds[0])} + ${name(j.characterIds[1])}: ${j.text}`).join(" | ") || "ninguna"}
 Casos especiales de la wiki entre personajes en juego: ${interactions.map((j) => `${name(j.characterIds[0])} + ${name(j.characterIds[1])}: ${j.text}`).join(" | ") || "ninguno"}
 Últimos sucesos:

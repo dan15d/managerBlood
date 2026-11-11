@@ -1,8 +1,9 @@
 import { defaultAlignment, isStorytellerTeam, type Character } from "@domain/entities/Character";
-import type { Game, GameMode, Player } from "@domain/entities/Game";
+import type { Game, GameMode, Player, StoredGame } from "@domain/entities/Game";
 import type { Script } from "@domain/entities/Script";
 import type { Seat } from "@domain/entities/Table";
 import { phaseLabel } from "@domain/services/GameRules";
+import { GAME_SCHEMA_VERSION } from "@domain/services/GameSchema";
 import { shuffle, type RandomFn } from "@domain/services/Random";
 import { applySetupEffects, seatMarionette } from "@domain/services/SetupGenerator";
 import { gameCharacterIds, jinxesAmong } from "@domain/services/SpecialRules";
@@ -10,7 +11,7 @@ import { isDealt, validateSelection } from "@domain/services/SetupRules";
 import type { AiStoryteller } from "../ports/AiStoryteller";
 import type { CharacterCatalog } from "../ports/CharacterCatalog";
 import type { CharacterGuideSource } from "../ports/CharacterGuides";
-import type { GameRepository, GameSummary } from "../ports/GameRepository";
+import { GameNotFoundError, type GameRepository, type GameSummary } from "../ports/GameRepository";
 import type { Unsubscribe } from "../ports/TableGateway";
 import type { IdGenerator } from "../ports/IdGenerator";
 import type { TablePublisher } from "../ports/TableGateway";
@@ -97,6 +98,7 @@ export class CreateGame {
 
     const now = new Date().toISOString();
     const game: Game = {
+      schemaVersion: GAME_SCHEMA_VERSION,
       id: input.table?.gameId ?? this.ids.uuid(),
       name: input.name.trim() || `${input.script.name} · ${new Date().toLocaleDateString("es-ES")}`,
       mode: input.mode,
@@ -106,6 +108,9 @@ export class CreateGame {
       players,
       fabledIds: fabled.map((c) => c.id),
       extraCharacterIds,
+      nightDeaths: [],
+      nightRevivals: [],
+      dayDeaths: [],
       demonBluffs: input.bluffIds.slice(0, 3),
       phase: { kind: "night", number: 1 },
       nightStep: 0,
@@ -135,7 +140,7 @@ export class LoadGame {
   constructor(private readonly repo: GameRepository) {}
   async execute(id: string): Promise<Game> {
     const game = await this.repo.get(id);
-    if (!game) throw new Error("No encuentro esa partida.");
+    if (!game) throw new GameNotFoundError();
     return game;
   }
 }
@@ -175,7 +180,8 @@ export class DeleteGame {
   }
 }
 
-export const summarize = (game: Game): GameSummary => ({
+/** Resumen para la lista de partidas (vale también para una guardada con una versión antigua). */
+export const summarize = (game: StoredGame): GameSummary => ({
   id: game.id,
   name: game.name,
   scriptName: game.scriptName,

@@ -47,6 +47,8 @@ export interface GameLogEntry {
 }
 
 export interface Game {
+  /** Versión del formato con que está guardada (ver GameSchema.ts). */
+  schemaVersion: number;
   id: string;
   name: string;
   mode: GameMode;
@@ -56,7 +58,7 @@ export interface Game {
   scriptCharacterIds?: string[];
   players: Player[];
   /** Fábulas y Lóricos en juego: los usa el Narrador, no son jugadores y toda la mesa los conoce. */
-  fabledIds?: string[];
+  fabledIds: string[];
   demonBluffs: string[];
   phase: Phase;
   /** Paso de la hoja de noche en el que va el Narrador. */
@@ -72,13 +74,13 @@ export interface Game {
   /** Día extra de la Mente maestra (tras ejecutar al Demonio). */
   mastermindDay?: number;
   /** Muertos esta noche: ya lo están en el Grimorio, pero la mesa no lo sabe hasta el amanecer. */
-  nightDeaths?: string[];
+  nightDeaths: string[];
   /** Resucitados esta noche (Profesor, Shabaloth…): la mesa los sigue viendo muertos hasta el amanecer. */
-  nightRevivals?: string[];
+  nightRevivals: string[];
   /** Muertos durante el día de hoy (el Zombuul solo ataca si no ha muerto nadie). */
-  dayDeaths?: string[];
+  dayDeaths: string[];
   /** Personajes en juego que no tiene ningún jugador (Lil' Monsta, que cuida un Esbirro). */
-  extraCharacterIds?: string[];
+  extraCharacterIds: string[];
   status: GameStatus;
   winner?: Alignment;
   log: GameLogEntry[];
@@ -89,3 +91,9 @@ export interface Game {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Campos que las partidas guardadas con versiones antiguas pueden no tener. */
+type AddedLater = "schemaVersion" | "fabledIds" | "nightDeaths" | "nightRevivals" | "dayDeaths" | "extraCharacterIds";
+
+/** Una partida tal como está guardada: puede venir de cualquier versión anterior de la app. */
+export type StoredGame = Omit<Game, AddedLater> & Partial<Pick<Game, AddedLater>>;

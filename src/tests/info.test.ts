@@ -3,6 +3,7 @@ import { StaticCharacterCatalog } from "@infrastructure/catalog/StaticCatalog";
 import type { Game, Player } from "@domain/entities/Game";
 import * as rules from "@domain/services/GameRules";
 import { infoHints, nearestEvilSide } from "@domain/services/NightInfo";
+import { NEW_GAME } from "./gameFixture";
 
 // Respuestas de la noche que la app calcula con el Grimorio.
 
@@ -21,6 +22,7 @@ function game(ids: string[], extra: Partial<Game> = {}): Game {
     reminders: [],
   }));
   return {
+    ...NEW_GAME,
     id: "g",
     name: "Prueba",
     mode: "manual",

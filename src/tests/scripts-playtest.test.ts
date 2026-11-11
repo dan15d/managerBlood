@@ -7,6 +7,7 @@ import { buildNightOrder } from "@domain/services/NightOrder";
 import { seededRandom } from "@domain/services/Random";
 import { applySetupEffects } from "@domain/services/SetupGenerator";
 import { publicAlive, publicPlayers } from "@domain/services/TableView";
+import { NEW_GAME } from "./gameFixture";
 
 // Casos que salieron al jugar Bad Moon Rising y Sects & Violets en la web publicada.
 
@@ -25,6 +26,7 @@ function game(ids: string[], extra: Partial<Game> = {}): Game {
     reminders: [],
   }));
   return {
+    ...NEW_GAME,
     id: "g",
     name: "Prueba",
     mode: "manual",
