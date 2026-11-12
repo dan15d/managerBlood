@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { errorMessage, useApp } from "../../app/AppContext";
 import { CharacterPicker } from "../../components/CharacterPicker";
+import { InfoTokenSheet } from "../../components/InfoTokenSheet";
 import { LogList } from "../../components/LogList";
 import { Menu } from "../../components/Menu";
 import { Sheet } from "../../components/Sheet";
@@ -64,6 +65,7 @@ export function GamePage() {
   const [pick, setPick] = useState<Pick | null>(null);
   const [ending, setEnding] = useState(false);
   const [addingFabled, setAddingFabled] = useState(false);
+  const [composing, setComposing] = useState(false);
   const [pitHagTarget, setPitHagTarget] = useState<string | null>(null);
   const characters = app.catalog.map();
   const gameRef = useRef<Game | null>(null);
@@ -397,6 +399,7 @@ export function GamePage() {
         <Menu
           label="Más acciones"
           items={[
+            { icon: <Eye />, label: "Enseñar al jugador…", onSelect: () => setComposing(true) },
             {
               icon: <ArrowLeftRight />,
               label: pick?.kind === "seat" ? "Dejar de cambiar sitios" : "Cambiar sitios",
@@ -648,6 +651,15 @@ export function GamePage() {
             }
           />
         </Sheet>
+      )}
+
+      {composing && (
+        <InfoTokenSheet
+          scriptCharacters={scriptCharacters}
+          suggested={step?.character ? [step.character] : []}
+          bluffs={game.demonBluffs.map((id) => characters.get(id)).filter((c): c is Character => !!c)}
+          onClose={() => setComposing(false)}
+        />
       )}
 
       {pitHagTarget && (

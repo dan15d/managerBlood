@@ -153,7 +153,7 @@ export function PlayerSheet({ game, player, characters, scriptCharacters, newId,
               className="btn btn--ghost"
               style={{ flex: 1 }}
               disabled={!believed}
-              onClick={() => believed && setCard({ heading: "Eres", characters: [believed] })}
+              onClick={() => believed && setCard({ heading: "Tú eres", characters: [believed] })}
             >
               <Eye /> Enseñarle su personaje
             </button>

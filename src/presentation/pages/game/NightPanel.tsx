@@ -9,12 +9,14 @@ import { useApp } from "../../app/AppContext";
 import { CharacterGuide, SpecialCases } from "../../components/CharacterGuide";
 import { CharacterPicker } from "../../components/CharacterPicker";
 import { Sheet } from "../../components/Sheet";
-import { INFO_HEADINGS, ShowCard } from "../../components/ShowCard";
+import { InfoTokenSheet, type InfoTokenDraft } from "../../components/InfoTokenSheet";
+import { ShowCard } from "../../components/ShowCard";
 import { Token } from "../../components/Token";
 import { NIGHT_ICONS } from "../../wikiAssets";
 import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, Lightbulb, Pointer, Skull, Sun, TriangleAlert, VenetianMask } from "lucide-react";
 import { choiceReminder, CHOICE_WITHOUT_REMINDER, infoHints } from "@domain/services/NightInfo";
 import { disablesAbility } from "@domain/services/Reminders";
+import { infoToken, stepInfoToken } from "@domain/services/InfoTokens";
 
 interface Props {
   game: Game;
@@ -44,13 +46,12 @@ export function StepIcon({ step, size }: { step: NightStep; size: number }) {
 /** La hoja de noche: solo los personajes en juego, en orden, con lo que hay que hacer en cada paso. */
 export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, onEditBluffs, onPickReminder, scriptCharacters }: Props) {
   const [card, setCard] = useState<Card | null>(null);
-  const [choosing, setChoosing] = useState(false);
+  const [composing, setComposing] = useState<InfoTokenDraft | null>(null);
   const [philosophising, setPhilosophising] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   // La lista de pasos va plegada (anterior, actual y siguiente): toda la noche solo si se pide.
   const [allSteps, setAllSteps] = useState(false);
   const { toast } = useApp();
-  const [heading, setHeading] = useState<string | undefined>(undefined);
   const index = Math.min(game.nightStep, steps.length - 1);
   const step = steps[index];
   const player = (id: string) => game.players.find((p) => p.id === id)!;
@@ -64,6 +65,9 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
   const chooser = step.character && step.playerIds.length > 0 ? choiceReminder(step.character.id, game.phase.number === 1) : undefined;
   const otherReminders = [...new Set(step.character?.reminders ?? [])].filter((label) => label !== chooser);
   // Lo que el registro ha apuntado esta noche (sin la línea de «Cae la noche»), para el amanecer.
+  // Ficha de información que acompaña a la del personaje en este paso («ESTE PERSONAJE TE HA ELEGIDO»…).
+  const stepToken = step.character && step.playerIds.length > 0 ? stepInfoToken(step.character.id, game.phase.number === 1) : undefined;
+  const bluffs = game.demonBluffs.map((id) => characters.get(id)).filter((c): c is Character => !!c);
   const nightLog = step.kind === "dawn" ? game.log.filter((l) => l.phase === rules.phaseLabel(game.phase) && !/^Cae la noche/.test(l.text)) : [];
 
   return (
@@ -222,7 +226,7 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
         )}
 
         {step.kind === "minion_info" && (
-          <button className="btn btn--block" onClick={() => setCard({ heading: "Este es el Demonio", characters: [] })}>
+          <button className="btn btn--block" onClick={() => setCard({ heading: infoToken("demon").text, characters: [] })}>
             <Eye /> Enseñar «Este es el Demonio»
           </button>
         )}
@@ -254,17 +258,14 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
               ))}
             </div>
             <div className="row" style={{ marginTop: 10 }}>
-              <button className="btn btn--primary" onClick={() => setCard({ heading: "Estos son tus Esbirros", characters: [] })}>
+              <button className="btn btn--primary" onClick={() => setCard({ heading: infoToken("minions").text, characters: [] })}>
                 <Eye /> «Tus Esbirros»
               </button>
               <button
                 className="btn btn--primary"
                 disabled={!game.demonBluffs.length}
                 onClick={() =>
-                  setCard({
-                    heading: "Estos personajes no están en juego",
-                    characters: game.demonBluffs.map((id) => characters.get(id)).filter((c): c is Character => !!c),
-                  })
+                  setCard({ heading: infoToken("not_in_play").text, characters: bluffs })
                 }
               >
                 <Eye /> Enseñar faroles
@@ -274,6 +275,19 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
               </button>
             </div>
           </>
+        )}
+        {stepToken && step.character && (
+          <button
+            className="btn btn--block"
+            style={{ marginTop: 8, whiteSpace: "normal", lineHeight: 1.2 }}
+            onClick={() =>
+              stepToken.more
+                ? setComposing({ token: stepToken.token, characters: [step.character!], note: stepToken.more })
+                : setCard({ heading: infoToken(stepToken.token).text, characters: [step.character!] })
+            }
+          >
+            <Eye /> Enseñar «{infoToken(stepToken.token).text}»
+          </button>
         )}
         {/* El Filósofo elige un personaje bueno: pasa a tener su ficha. */}
         {step.character?.id === "philosopher" && step.playerIds.length > 0 && (
@@ -289,8 +303,8 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
                 <BookOpen /> Guía
               </button>
             )}
-            <button className="btn btn--small btn--ghost" onClick={() => setChoosing(true)}>
-              <Eye /> Enseñar un personaje…
+            <button className="btn btn--small btn--ghost" onClick={() => setComposing({})}>
+              <Eye /> Enseñar al jugador…
             </button>
           </div>
         )}
@@ -360,32 +374,14 @@ export function NightPanel({ game, steps, characters, onChange, onOpenPlayer, on
         </Sheet>
       )}
 
-      {choosing && (
-        <Sheet onClose={() => setChoosing(false)} title="Enseñar un personaje" label="Enseñar un personaje">
-          <p className="muted small" style={{ marginTop: 0 }}>
-            Elige el encabezado (opcional) y toca el personaje para enseñarlo a pantalla completa.
-          </p>
-          <div className="heading-chips">
-            {INFO_HEADINGS.filter((h) => h !== "Estos son tus Esbirros").map((h) => (
-              <button key={h} className="chip" aria-pressed={heading === h} onClick={() => setHeading(heading === h ? undefined : h)}>
-                {h}
-              </button>
-            ))}
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <CharacterPicker
-              characters={scriptCharacters}
-              selected={[]}
-              searchable
-              onToggle={(id) => {
-                const c = characters.get(id);
-                if (!c) return;
-                setChoosing(false);
-                setCard({ heading, characters: [c] });
-              }}
-            />
-          </div>
-        </Sheet>
+      {composing && (
+        <InfoTokenSheet
+          scriptCharacters={scriptCharacters}
+          suggested={step.character ? [step.character] : []}
+          bluffs={bluffs}
+          initial={composing}
+          onClose={() => setComposing(null)}
+        />
       )}
 
       {philosophising && (

@@ -2493,12 +2493,45 @@ button.token {
   animation: fade 0.15s;
 }
 
+/* Como la ficha de información física: en mayúsculas y bien grande, que se lea desde lejos. */
 .show-card__heading {
   margin: 0;
-  max-width: 14ch;
-  font-size: clamp(2rem, 9vw, 3.2rem);
+  max-width: 16ch;
+  font-size: clamp(1.9rem, 8.5vw, 3rem);
+  line-height: 1.1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-wrap: balance;
   color: var(--parchment);
   text-shadow: 0 2px 12px rgb(0 0 0 / 0.7);
+}
+
+.show-card__heading--alone {
+  max-width: 12ch;
+  font-size: clamp(2.4rem, 12vw, 4.2rem);
+}
+
+.show-card__thumb {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  border: 3px solid currentColor;
+  background: rgb(0 0 0 / 0.25);
+}
+
+.show-card__thumb .lucide {
+  width: 60px;
+  height: 60px;
+}
+
+.show-card__thumb--good {
+  color: var(--good);
+}
+
+.show-card__thumb--evil {
+  color: var(--evil);
 }
 
 .show-card__tokens {
@@ -2547,12 +2580,138 @@ button.token {
   color: var(--muted);
 }
 
-.heading-chips {
+/* ---------- Enseñar al jugador (fichas de información) ---------- */
+
+/* Vista previa en pequeño de la tarjeta: lo que verá el jugador. */
+.info-preview {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-bottom: 4px;
+  width: 100%;
+  min-height: 116px;
+  padding: 14px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(ellipse 90% 70% at 50% 40%, rgb(124 72 196 / 0.4), transparent 70%),
+    linear-gradient(180deg, #1d1230, #0f0a15);
+  color: var(--parchment);
+  text-align: center;
+  cursor: pointer;
+  font: inherit;
+}
+
+.info-preview:disabled {
+  cursor: default;
+  border-style: dashed;
+}
+
+.info-preview:not(:disabled):hover {
+  border-color: var(--gold);
+}
+
+.info-preview__empty {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.info-preview__heading {
+  max-width: 20ch;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.info-preview__tokens {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.info-preview__thumb .lucide {
+  width: 28px;
+  height: 28px;
+}
+
+.info-note {
+  margin: 8px 0 0;
+  color: var(--gold-bright);
+}
+
+.info-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.info-tokens {
+  display: grid;
+  gap: 6px;
+}
+
+.info-token {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 52px;
+  padding: 9px 40px 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.info-token:hover {
+  border-color: var(--line-strong);
+}
+
+.info-token[aria-pressed="true"] {
+  border-color: var(--gold-bright);
+  background: var(--surface-3);
+}
+
+.info-token__text {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-strong);
+}
+
+.info-token__use {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.info-token__check {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  transform: translateY(-50%);
+  color: var(--gold-bright);
+}
+
+.info-char {
+  padding-left: 4px;
+}
+
+.info-picker {
+  margin-top: 12px;
 }
 
 /* ---------- Avisos ---------- */
