@@ -3,8 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { supabaseConfigured } from "../app/container";
 
-// Sugerencias; se puede escribir cualquier modelo de OpenRouter.
-const MODELS = [{ id: "deepseek/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash (barato y rápido)" }];
+// Sugerencias de modelos de DeepSeek. La función en la nube solo acepta los de su lista (README).
+const MODELS = [
+  { id: "deepseek-flash", label: "DeepSeek Flash (barato y rápido)" },
+  { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro (más listo, unas 4 veces más caro)" },
+];
 
 export function SettingsPage() {
   const { app, settings, updateSettings, toast, refreshRole } = useApp();
@@ -49,7 +52,7 @@ export function SettingsPage() {
       <section className="card stack" style={{ marginTop: 16 }}>
         <h2>Modo IA</h2>
         <p className="muted">
-          La IA prepara repartos de personajes y te aconseja durante la partida. Usa OpenRouter con DeepSeek: cuesta céntimos por
+          La IA prepara repartos de personajes y te aconseja durante la partida. Usa DeepSeek: cuesta céntimos por
           partida.
         </p>
 
@@ -75,7 +78,7 @@ export function SettingsPage() {
                 onChange={() => setForm({ ...form, aiTransport: "browser" })}
               />
               <span>
-                <strong>Desde este navegador</strong> <span className="muted small">(con tu clave de OpenRouter)</span>
+                <strong>Desde este navegador</strong> <span className="muted small">(con tu clave de DeepSeek)</span>
               </span>
             </label>
           </fieldset>
@@ -83,21 +86,21 @@ export function SettingsPage() {
 
         {form.aiTransport === "browser" && (
           <label className="field">
-            <span>Clave de OpenRouter</span>
+            <span>Clave de DeepSeek</span>
             <input
               className="input"
               type="password"
               autoComplete="off"
-              placeholder="sk-or-…"
-              value={form.openRouterKey}
-              onChange={(e) => setForm({ ...form, openRouterKey: e.target.value.trim() })}
+              placeholder="sk-…"
+              value={form.deepseekKey}
+              onChange={(e) => setForm({ ...form, deepseekKey: e.target.value.trim() })}
             />
             <small className="muted">
               Se guarda solo en este navegador. Créala en{" "}
-              <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">
-                openrouter.ai/keys
-              </a>{" "}
-              y ponle un límite de gasto.
+              <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">
+                platform.deepseek.com/api_keys
+              </a>
+              . DeepSeek es de prepago: solo gasta el saldo que cargues.
             </small>
           </label>
         )}

@@ -316,7 +316,7 @@ export function NewGamePage() {
           </div>
           {!app.aiAvailable && (
             <p className="muted small" style={{ marginTop: 12 }}>
-              El modo IA necesita conexión con OpenRouter. <Link to="/ajustes">Configúralo en Ajustes</Link>.
+              El modo IA necesita conexión con DeepSeek. <Link to="/ajustes">Configúralo en Ajustes</Link>.
             </p>
           )}
         </section>

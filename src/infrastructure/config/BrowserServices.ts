@@ -1,10 +1,17 @@
 import type { IdGenerator } from "@application/ports/IdGenerator";
 import type { AppSettings, SettingsStore } from "@application/ports/SettingsStore";
 
+/**
+ * Los modelos de OpenRouter llevan «proveedor/modelo» y DeepSeek directo no los entiende: puede
+ * quedar alguno guardado en un navegador o en la variable VITE_AI_MODEL de GitHub.
+ */
+const isOpenRouterModel = (model: unknown) => typeof model !== "string" || !model || model.includes("/");
+const configuredModel = import.meta.env.VITE_AI_MODEL as string | undefined;
+
 export const env = {
   supabaseUrl: (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? "",
   supabaseAnonKey: (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? "",
-  aiModel: (import.meta.env.VITE_AI_MODEL as string | undefined) || "deepseek/deepseek-v4.1-flash",
+  aiModel: isOpenRouterModel(configuredModel) ? "deepseek-flash" : (configuredModel as string),
 };
 
 export const hasSupabase = () => !!(env.supabaseUrl && env.supabaseAnonKey);
@@ -27,13 +34,17 @@ const SETTINGS_KEY = "grimorio.settings";
 export class LocalSettingsStore implements SettingsStore {
   load(): AppSettings {
     const defaults: AppSettings = {
-      openRouterKey: "",
+      deepseekKey: "",
       aiModel: env.aiModel,
       // La función en la nube hay que desplegarla aparte (README); hasta entonces, la clave del navegador.
       aiTransport: "browser",
     };
     try {
-      return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") };
+      // Ajustes de cuando se usaba OpenRouter: su clave no vale para DeepSeek y su modelo tampoco.
+      const { openRouterKey: _old, ...saved } = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}");
+      const settings: AppSettings = { ...defaults, ...saved };
+      if (isOpenRouterModel(settings.aiModel)) settings.aiModel = env.aiModel;
+      return settings;
     } catch {
       return defaults;
     }

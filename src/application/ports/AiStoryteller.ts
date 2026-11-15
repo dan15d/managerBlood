@@ -53,7 +53,7 @@ export interface AiScriptProposal {
   explanation: string;
 }
 
-/** Narrador con IA. Las implementaciones deciden el proveedor (OpenRouter, función en la nube…). */
+/** Narrador con IA. Las implementaciones deciden el proveedor (DeepSeek, función en la nube…). */
 export interface AiStoryteller {
   isAvailable(): boolean;
   /** Pregunta algo trivial para comprobar clave, saldo y modelo. */

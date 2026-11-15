@@ -5,7 +5,7 @@ import { CompleteManualSetup, GenerateAiSetup, SuggestRandomSetup } from "@appli
 import { AdminSession, ManageLobby, PlayerTable } from "@application/use-cases/TableUseCases";
 import { GenerateAiScript } from "@application/use-cases/AiScriptUseCases";
 import { ListSpecialCases, ReadCharacterGuide } from "@application/use-cases/GuideUseCases";
-import { BrowserOpenRouterTransport, SupabaseFunctionTransport, type ChatTransport } from "@infrastructure/ai/ChatTransport";
+import { BrowserDeepSeekTransport, SupabaseFunctionTransport, type ChatTransport } from "@infrastructure/ai/ChatTransport";
 import { LlmStoryteller } from "@infrastructure/ai/LlmStoryteller";
 import { StaticCharacterCatalog, StaticOfficialScripts } from "@infrastructure/catalog/StaticCatalog";
 import { StaticCharacterGuides } from "@infrastructure/catalog/StaticGuides";
@@ -32,7 +32,7 @@ const supabase: SupabaseClient | null = hasSupabase() ? createClient(env.supabas
 
 function transportFor(settings: AppSettings): ChatTransport | null {
   if (settings.aiTransport === "cloud" && supabase) return new SupabaseFunctionTransport(supabase, settings.aiModel);
-  if (settings.openRouterKey) return new BrowserOpenRouterTransport(settings.openRouterKey, settings.aiModel);
+  if (settings.deepseekKey) return new BrowserDeepSeekTransport(settings.deepseekKey, settings.aiModel);
   return null;
 }
 

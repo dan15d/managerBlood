@@ -42,7 +42,7 @@ export function AiPanel({ game }: { game: Game }) {
 
       {!app.aiAvailable ? (
         <div className="alert alert--info">
-          El consejero de IA necesita conexión con OpenRouter. <Link to="/ajustes">Configúralo en Ajustes</Link>.
+          El consejero de IA necesita conexión con DeepSeek. <Link to="/ajustes">Configúralo en Ajustes</Link>.
         </div>
       ) : (
         <>

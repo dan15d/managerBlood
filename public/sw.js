@@ -3,7 +3,7 @@
 // · Los archivos de /assets llevan un hash en el nombre: se guardan y se sirven desde la caché.
 // · Los iconos de los personajes (/roles) y los logos e iconos de la wiki (/img) también: así el Grimorio
 //   sale entero aunque no haya cobertura.
-// · Nada de Supabase, OpenRouter ni otras webs pasa por aquí.
+// · Nada de Supabase, DeepSeek ni otras webs pasa por aquí.
 const CACHE = "grimorio-v3";
 const SHELL = ["./", "./manifest.webmanifest", "./favicon.png", "./logo.webp", "./icon-192.png", "./icon-512.png"];
 

@@ -1,8 +1,8 @@
 export interface AppSettings {
-  /** Clave de OpenRouter guardada solo en este navegador (si no hay función en la nube). */
-  openRouterKey: string;
+  /** Clave de DeepSeek guardada solo en este navegador (si no hay función en la nube). */
+  deepseekKey: string;
   aiModel: string;
-  /** "cloud" usa la Edge Function de Supabase; "browser" llama a OpenRouter con la clave local. */
+  /** "cloud" usa la Edge Function de Supabase; "browser" llama a DeepSeek con la clave local. */
   aiTransport: "cloud" | "browser";
 }
 

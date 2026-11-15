@@ -2,7 +2,7 @@
 
 Webapp de Blood on the Clocktower pensada primero para el móvil, con dos modos:
 
-- **Narrador** (con contraseña): prepara la partida en modo **manual** o con **IA** (OpenRouter + DeepSeek), abre una sala con código y QR, reparte y lleva el Grimorio: noche paso a paso, votos y final.
+- **Narrador** (con contraseña): prepara la partida en modo **manual** o con **IA** (DeepSeek), abre una sala con código y QR, reparte y lleva el Grimorio: noche paso a paso, votos y final.
 - **Jugador** (sin cuenta): se une con el código y ve la lista de personajes del guion, la fase y quién sigue vivo, en tiempo real. Su personaje **no** sale en su móvil: se lo enseña el Narrador en persona («Repartir», o «Enseñar un personaje» por la noche), como con la ficha física, para que nadie pueda enseñar la pantalla como prueba.
 
 Se puede instalar en el móvil desde el navegador («Añadir a pantalla de inicio»).
@@ -103,20 +103,22 @@ Cada navegador tiene su sesión anónima. Para el Narrador no importa (lo que cu
 
 Prueba de punta a punta contra Supabase (no corre con `npm test`): ver `src/tests/table.integration.test.ts`.
 
-## Modo IA (OpenRouter + DeepSeek)
+## Modo IA (DeepSeek)
+
+Usa la API directa de DeepSeek (`api.deepseek.com`), como rolAI. La clave se crea en [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys); la cuenta es de prepago, así que nunca gasta más del saldo cargado.
 
 Recomendado, con Supabase: la clave vive en una Edge Function y nunca llega al navegador.
 
 ```bash
 npx supabase login
 npx supabase link --project-ref <tu-proyecto>
-npx supabase secrets set OPENROUTER_API_KEY=sk-or-...
+npx supabase secrets set DEEPSEEK_API_KEY=sk-...
 npx supabase functions deploy ai-storyteller
 ```
 
-La función solo atiende a los Narradores: comprueba `is_admin()` con la sesión de quien llama y rechaza al resto. Pon igualmente un **límite de gasto** a la clave en OpenRouter. La función solo acepta los modelos de `ALLOWED_MODELS` (por defecto `deepseek/deepseek-v4.1-flash`).
+La función solo atiende a los Narradores: comprueba `is_admin()` con la sesión de quien llama y rechaza al resto. Solo acepta los modelos del secreto `DEEPSEEK_MODELS` (por defecto `deepseek-flash`; para permitir también el Pro: `DEEPSEEK_MODELS=deepseek-flash,deepseek-v4-pro`). Si llega otro, usa el primero de la lista.
 
-Para pruebas sin Supabase: en **Ajustes** de la app se puede pegar una clave de OpenRouter, que se guarda solo en ese navegador.
+Para pruebas sin Supabase: en **Ajustes** de la app se puede pegar una clave de DeepSeek, que se guarda solo en ese navegador.
 
 ## Publicar en GitHub Pages
 

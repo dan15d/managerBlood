@@ -1,8 +1,8 @@
-// Edge Function de Supabase: hace de intermediaria con OpenRouter para que la clave no llegue
-// nunca al navegador (la web en GitHub Pages es pública).
+// Edge Function de Supabase: hace de intermediaria con la API de DeepSeek para que la clave no
+// llegue nunca al navegador (la web en GitHub Pages es pública).
 //
 // Despliegue:
-//   supabase secrets set OPENROUTER_API_KEY=sk-or-...
+//   supabase secrets set DEEPSEEK_API_KEY=sk-...
 //   supabase functions deploy ai-storyteller
 //
 // Supabase comprueba el JWT de la sesión antes de llegar aquí; como cualquiera que abra la web
@@ -11,9 +11,10 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-// Solo se permiten estos modelos para que nadie gaste saldo con otros más caros.
-const ALLOWED_MODELS = (Deno.env.get("ALLOWED_MODELS") ?? "deepseek/deepseek-v4.1-flash").split(",").map((m) => m.trim());
+const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
+// Solo se permiten estos modelos para que nadie gaste saldo con otros más caros. Si llega otro
+// (p. ej. el nombre antiguo de OpenRouter, guardado en algún navegador), se usa el primero.
+const ALLOWED_MODELS = (Deno.env.get("DEEPSEEK_MODELS") ?? "deepseek-flash").split(",").map((m) => m.trim());
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -42,8 +43,8 @@ Deno.serve(async (req) => {
 
   if (!(await isStoryteller(req))) return json({ error: { message: "Solo el Narrador puede usar la IA." } }, 403);
 
-  const key = Deno.env.get("OPENROUTER_API_KEY");
-  if (!key) return json({ error: { message: "Falta el secreto OPENROUTER_API_KEY en Supabase." } }, 500);
+  const key = Deno.env.get("DEEPSEEK_API_KEY");
+  if (!key) return json({ error: { message: "Falta el secreto DEEPSEEK_API_KEY en Supabase." } }, 500);
 
   let body: { model?: string; messages?: unknown[]; json?: boolean; temperature?: number };
   try {
@@ -56,19 +57,20 @@ Deno.serve(async (req) => {
     return json({ error: { message: "Faltan los mensajes." } }, 400);
   }
 
-  const res = await fetch(OPENROUTER_URL, {
+  // Mismo cuerpo que deepseekBody en src/infrastructure/ai/ChatTransport.ts.
+  const res = await fetch(DEEPSEEK_URL, {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "X-Title": "Grimorio BotC" },
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model,
       messages: body.messages,
       temperature: typeof body.temperature === "number" ? body.temperature : 0.8,
       max_tokens: 4000,
-      reasoning: { effort: "low" },
-      provider: { sort: "price", quantizations: ["fp8", "bf16", "fp16", "fp32"] },
+      reasoning_effort: "low",
       ...(body.json ? { response_format: { type: "json_object" } } : {}),
     }),
   });
-  const data = await res.json().catch(() => ({ error: { message: `OpenRouter ha respondido ${res.status}` } }));
+  const data = await res.json().catch(() => ({ error: { message: `DeepSeek ha respondido ${res.status}` } }));
+  if (res.status === 402) return json({ error: { message: "No queda saldo en DeepSeek." } }, 402);
   return json(data, res.ok ? 200 : res.status);
 });
