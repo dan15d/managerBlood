@@ -6,6 +6,7 @@ import type { ChatMessage } from "@infrastructure/ai/ChatTransport";
 import { LlmStoryteller } from "@infrastructure/ai/LlmStoryteller";
 import { StaticCharacterCatalog, StaticOfficialScripts } from "@infrastructure/catalog/StaticCatalog";
 import { describe, expect, it } from "vitest";
+import { NEW_GAME } from "./gameFixture";
 
 const catalog = new StaticCharacterCatalog();
 const tb = new StaticOfficialScripts().list().find((s) => s.id === "trouble-brewing")!;
@@ -119,6 +120,7 @@ describe("revisar guion con IA", () => {
 });
 
 const finishedGame = (extra: Partial<Game> = {}): Game => ({
+  ...NEW_GAME,
   id: "g",
   name: "Prueba",
   mode: "manual",
