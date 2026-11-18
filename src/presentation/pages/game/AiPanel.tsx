@@ -1,5 +1,5 @@
 import type { Game } from "@domain/entities/Game";
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { Link } from "react-router-dom";
 import { errorMessage, useApp } from "../../app/AppContext";
 
@@ -10,22 +10,43 @@ const QUICK = [
   "¿Cómo resuelvo la interacción entre los personajes en juego?",
 ];
 
-/** Consejero de IA: ve el Grimorio entero y responde dudas del Narrador. Las respuestas no se guardan. */
-export function AiPanel({ game }: { game: Game }) {
+/** Una pregunta al consejero y lo que respondió (o el error, que no cuenta como conversación). */
+export interface AiExchange {
+  q: string;
+  a: string;
+  error?: boolean;
+}
+
+interface Props {
+  game: Game;
+  /** Lo hablado hasta ahora, lo último primero. Lo guarda la página para que sobreviva al cambio de pestaña. */
+  thread: AiExchange[];
+  onThreadChange: Dispatch<SetStateAction<AiExchange[]>>;
+}
+
+/**
+ * Consejero de IA: ve el Grimorio entero y responde dudas del Narrador. Recuerda la conversación
+ * mientras la partida siga abierta, así que se puede repreguntar; no se guarda con la partida.
+ */
+export function AiPanel({ game, thread, onThreadChange }: Props) {
   const { app } = useApp();
   const [question, setQuestion] = useState("");
-  const [answers, setAnswers] = useState<{ q: string; a: string; error?: boolean }[]>([]);
   const [loading, setLoading] = useState(false);
 
   const ask = async (q: string) => {
     if (!q.trim() || loading) return;
     setLoading(true);
     setQuestion("");
+    // Al consejero se le recuerda en orden, de lo más antiguo a lo más reciente, y sin los errores.
+    const history = thread
+      .filter((x) => !x.error)
+      .map((x) => ({ question: x.q, answer: x.a }))
+      .reverse();
     try {
-      const a = await app.askAi.execute(game, q);
-      setAnswers((list) => [{ q, a }, ...list]);
+      const a = await app.askAi.execute(game, q, history);
+      onThreadChange((list) => [{ q, a }, ...list]);
     } catch (e) {
-      setAnswers((list) => [{ q, a: errorMessage(e), error: true }, ...list]);
+      onThreadChange((list) => [{ q, a: errorMessage(e), error: true }, ...list]);
     } finally {
       setLoading(false);
     }
@@ -62,16 +83,23 @@ export function AiPanel({ game }: { game: Game }) {
           >
             <textarea
               className="input"
-              placeholder="Pregunta lo que quieras sobre la partida…"
+              placeholder={thread.length ? "Sigue preguntando: recuerda lo que habéis hablado…" : "Pregunta lo que quieras sobre la partida…"}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
             />
-            <button className="btn btn--primary" disabled={!question.trim() || loading}>
-              {loading ? "Pensando…" : "Preguntar"}
-            </button>
+            <div className="row">
+              <button className="btn btn--primary" style={{ flex: 1 }} disabled={!question.trim() || loading}>
+                {loading ? "Pensando…" : "Preguntar"}
+              </button>
+              {thread.length > 0 && (
+                <button type="button" className="btn btn--ghost" disabled={loading} onClick={() => onThreadChange([])}>
+                  Empezar de cero
+                </button>
+              )}
+            </div>
           </form>
-          {answers.map((x, i) => (
-            <div key={i} className={`alert ${x.error ? "alert--error" : "alert--info"}`}>
+          {thread.map((x, i) => (
+            <div key={thread.length - i} className={`alert ${x.error ? "alert--error" : "alert--info"}`}>
               <div className="small muted" style={{ marginBottom: 6 }}>
                 {x.q}
               </div>

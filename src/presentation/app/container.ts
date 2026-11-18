@@ -1,9 +1,19 @@
 import type { AppSettings } from "@application/ports/SettingsStore";
-import { AskAiAdvice, CreateGame, DeleteGame, ListGames, LoadGame, SaveGame, TestAiConnection, WatchGame } from "@application/use-cases/GameUseCases";
+import {
+  AskAiAdvice,
+  CreateGame,
+  DeleteGame,
+  ListGames,
+  LoadGame,
+  SaveGame,
+  TestAiConnection,
+  WatchGame,
+  WriteAiChronicle,
+} from "@application/use-cases/GameUseCases";
 import { DeleteCustomScript, ListScripts, ParseScriptJson, SaveCustomScript } from "@application/use-cases/ScriptUseCases";
 import { CompleteManualSetup, GenerateAiSetup, SuggestRandomSetup } from "@application/use-cases/SetupUseCases";
 import { AdminSession, ManageLobby, PlayerTable } from "@application/use-cases/TableUseCases";
-import { GenerateAiScript } from "@application/use-cases/AiScriptUseCases";
+import { GenerateAiScript, ReviewAiScript } from "@application/use-cases/AiScriptUseCases";
 import { ListSpecialCases, ReadCharacterGuide } from "@application/use-cases/GuideUseCases";
 import { BrowserDeepSeekTransport, SupabaseFunctionTransport, type ChatTransport } from "@infrastructure/ai/ChatTransport";
 import { LlmStoryteller } from "@infrastructure/ai/LlmStoryteller";
@@ -65,6 +75,8 @@ export function buildContainer(settings: AppSettings) {
     watchGame: new WatchGame(games),
     deleteGame: new DeleteGame(games, publisher),
     askAi: new AskAiAdvice(ai, catalog, guides),
+    writeChronicle: new WriteAiChronicle(ai, catalog),
+    reviewAiScript: new ReviewAiScript(catalog, ai),
     readGuide: new ReadCharacterGuide(catalog, guides),
     listSpecialCases: new ListSpecialCases(catalog, guides),
     testAi: new TestAiConnection(ai),

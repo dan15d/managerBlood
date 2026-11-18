@@ -2,13 +2,14 @@ import { scriptCharacters } from "@application/use-cases/SetupUseCases";
 import type { Character } from "@domain/entities/Character";
 import { FIRST_NIGHT_DEMON_INFO, FIRST_NIGHT_MINION_INFO } from "@domain/services/NightOrder";
 import { jinxesAmong } from "@domain/services/SpecialRules";
-import { ArrowLeft, Copy, Moon, Pencil, Play, ScrollText, Sunrise } from "lucide-react";
+import { ArrowLeft, Copy, Moon, Pencil, Play, ScrollText, Sparkles, Sunrise } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useApp } from "../app/AppContext";
 import { EditionBanner } from "../components/EditionBanner";
 import { JinxList } from "../components/JinxList";
 import { ScriptCharacterList } from "../components/ScriptCharacterList";
+import { ScriptReviewSheet, useScriptReview } from "../components/ScriptReviewSheet";
 import { Token } from "../components/Token";
 import { useAsync } from "../hooks/useAsync";
 import { NIGHT_ICONS } from "../wikiAssets";
@@ -57,6 +58,7 @@ export function ScriptViewPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("characters");
   const [fullText, setFullText] = useState(false);
+  const review = useScriptReview();
   const scripts = useAsync(() => app.listScripts.execute(), [app]);
   const script = scripts.data?.find((s) => s.id === id);
   const characters = useMemo(() => (script ? scriptCharacters(app.catalog, script) : []), [app, script]);
@@ -93,6 +95,9 @@ export function ScriptViewPage() {
         <button className="btn btn--small btn--ghost" onClick={copyJson} aria-label="Copiar JSON">
           <Copy />
           <span className="label-wide"> JSON</span>
+        </button>
+        <button className="btn btn--small btn--ghost" onClick={() => review.start(script.name, script.characterIds)}>
+          <Sparkles /> Revisar
         </button>
         <button
           className="btn btn--small"
@@ -163,6 +168,8 @@ export function ScriptViewPage() {
           ))}
         </ol>
       )}
+
+      {review.open && <ScriptReviewSheet state={review} name={script.name} characterIds={script.characterIds} />}
 
       <div className="wizard-footer">
         <button className="btn btn--primary btn--big" onClick={() => navigate(`/nueva?guion=${script.id}`)}>

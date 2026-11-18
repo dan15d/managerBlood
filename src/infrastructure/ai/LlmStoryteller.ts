@@ -1,15 +1,23 @@
 import type {
   AiAdviceRequest,
+  AiChronicleRequest,
   AiScriptProposal,
   AiScriptRequest,
+  AiScriptReview,
+  AiScriptReviewRequest,
   AiSetupProposal,
   AiSetupRequest,
   AiStoryteller,
   SetupStyle,
 } from "@application/ports/AiStoryteller";
-import { TEAM_LABEL } from "@domain/entities/Character";
+import { TEAM_LABEL, type Character } from "@domain/entities/Character";
 import { phaseLabel } from "@domain/services/GameRules";
-import type { ChatTransport } from "./ChatTransport";
+import type { ChatMessage, ChatTransport } from "./ChatTransport";
+
+/** Turnos anteriores que se le recuerdan al consejero: los últimos, para que el coste no crezca sin fin. */
+const ADVICE_HISTORY_LIMIT = 6;
+/** Entradas del registro que se mandan para la crónica. */
+const CHRONICLE_LOG_LIMIT = 300;
 
 const STYLE: Record<SetupStyle, string> = {
   equilibrada: "Una partida equilibrada en la que ambos equipos tengan opciones reales.",
@@ -131,7 +139,111 @@ Responde SOLO con un objeto JSON: {"name": "nombre evocador en español", "descr
     };
   }
 
-  async advise({ game, characters, jinxes, interactions, question }: AiAdviceRequest): Promise<string> {
+  async reviewScript(r: AiScriptReviewRequest): Promise<AiScriptReview> {
+    const line = (c: Character) => `- ${c.id} | ${c.name} | ${TEAM_LABEL[c.team].singular} | ${c.ability}`;
+    const nameOf = (id: string) => r.characters.find((c) => c.id === id)?.name ?? id;
+    const count = (team: Character["team"]) => r.characters.filter((c) => c.team === team).length;
+    const prompt = `Revisa este guion personalizado de Blood on the Clocktower como lo haría un diseñador de guiones con experiencia.
+
+Guion «${r.name || "Sin nombre"}»: ${count("townsfolk")} Aldeanos, ${count("outsider")} Forasteros, ${count("minion")} Esbirros, ${count("demon")} Demonios.
+Un guion clásico tiene 13 / 4 / 4 / 4 y uno pequeño (5-6 jugadores) 6 / 2 / 2 / 1; si el reparto se aparta de eso, dilo.
+
+Personajes del guion (id | nombre | tipo | habilidad):
+${r.characters.map(line).join("\n")}
+
+Incompatibilidades (jinxes) entre ellos: ${r.jinxes.map((j) => `${nameOf(j.characterIds[0])} + ${nameOf(j.characterIds[1])}: ${j.text}`).join(" | ") || "ninguna"}
+
+Qué mirar:
+- Información del Bien: si hay suficiente y de tipos distintos (primera noche, cada noche, al morir, de día), y cuánta puede falsear el Mal.
+- Desinformación: fuentes de borrachera, envenenamiento o locura, y si son demasiadas o demasiado pocas para la información que hay.
+- Protección y muertes extra: si el Demonio puede quedarse sin matar o si el pueblo se vacía demasiado rápido.
+- Faroles: si Esbirros y Demonios tienen Aldeanos y Forasteros creíbles que fingir, y si algún personaje se confirma solo con demasiada facilidad.
+- Cada Demonio y cada Esbirro: si alguno queda flojo, demasiado fuerte o sin apoyo en este guion.
+- Forasteros: si molestan de verdad al Bien y si hay algo que cambie cuántos hay.
+- Combinaciones concretas que rompen la partida, la alargan o son difíciles de arbitrar.
+
+Personajes que NO están en el guion y puedes proponer a cambio (id | nombre | tipo | habilidad):
+${r.alternatives.map(line).join("\n")}
+
+Reglas de la respuesta:
+- "verdict": 2-3 frases con la valoración general y para qué tipo de mesa sirve.
+- "strengths": 2-4 puntos fuertes, cada uno nombrando personajes concretos.
+- "problems": de 0 a 5 problemas reales, de más grave a menos, cada uno nombrando personajes concretos. No inventes problemas si el guion está bien.
+- "swaps": de 0 a 4 cambios, cada uno {"removeId": id del guion, "addId": id de la lista de fuera, "reason": una frase}. Mejor del mismo tipo, salvo que quieras corregir el reparto.
+Escribe los nombres de los personajes como aparecen en las listas, nunca los ids, salvo en removeId y addId.
+
+Responde SOLO con un objeto JSON: {"verdict": "", "strengths": [], "problems": [], "swaps": [{"removeId": "", "addId": "", "reason": ""}]}`;
+
+    const text = await this.chat.complete(
+      [
+        { role: "system", content: BASE_RULES },
+        { role: "user", content: prompt },
+      ],
+      { json: true, temperature: 0.5 },
+    );
+    const data = parseJson(text);
+    const swaps = (Array.isArray(data.swaps) ? data.swaps : [])
+      .filter((s: unknown): s is Record<string, unknown> => typeof s === "object" && !!s)
+      .map((s: Record<string, unknown>) => ({
+        removeId: typeof s.removeId === "string" ? s.removeId : "",
+        addId: typeof s.addId === "string" ? s.addId : "",
+        reason: typeof s.reason === "string" ? s.reason : "",
+      }));
+    return {
+      verdict: typeof data.verdict === "string" ? data.verdict : "",
+      strengths: asStringArray(data.strengths),
+      problems: asStringArray(data.problems),
+      swaps,
+    };
+  }
+
+  async chronicle({ game, characters }: AiChronicleRequest): Promise<string> {
+    const name = (id?: string) => (id ? (characters.get(id)?.name ?? id) : "");
+    const cast = game.players
+      .map((p) => {
+        const c = characters.get(p.characterId);
+        const parts = [
+          `${p.name}: ${c?.name ?? p.characterId} (${c ? TEAM_LABEL[c.team].singular : "?"}, ${p.alignment === "good" ? "Bueno" : "Malvado"})`,
+          p.alive ? "acabó vivo" : "acabó muerto",
+        ];
+        if (p.shownCharacterId) parts.push(`creía ser ${name(p.shownCharacterId)}`);
+        return parts.join(" · ");
+      })
+      .join("\n");
+    // Con las partidas más largas basta el final del registro para no disparar el coste.
+    const log = game.log
+      .slice(-CHRONICLE_LOG_LIMIT)
+      .map((l) => `[${l.phase}] ${l.text}`)
+      .join("\n");
+    const prompt = `Escribe la crónica de esta partida ya terminada, para leerla en voz alta o mandarla al grupo.
+
+Partida «${game.name}», guion ${game.scriptName}. Resultado: ${game.winner === "good" ? "ganó el Bien" : game.winner === "evil" ? "ganó el Mal" : "sin ganador declarado"}.
+
+Quién era quién (ya se puede contar todo, la partida ha acabado):
+${cast}
+Faroles del Demonio: ${game.demonBluffs.map(name).join(", ") || "ninguno"}
+
+Registro de la partida, en orden:
+${log || "(vacío)"}
+
+Cómo escribirla:
+- Primera línea: un titular corto. Después, 3 o 4 párrafos breves (unas 220 palabras en total).
+- Cuenta lo que pasó de verdad, en orden, usando los nombres de los jugadores y sus personajes: las muertes, las ejecuciones, las votaciones ajustadas y el momento que decidió la partida.
+- Destaca la mejor jugada y el engaño que mejor funcionó, si el registro los deja ver.
+- Tono de cronista de pueblo, con algo de humor negro, sin burlarte de nadie.
+- No inventes hechos que no estén en el registro. Si el registro es pobre, haz la crónica más corta.
+- Texto plano, sin Markdown, sin asteriscos y sin listas.`;
+
+    return this.chat.complete(
+      [
+        { role: "system", content: BASE_RULES },
+        { role: "user", content: prompt },
+      ],
+      { temperature: 0.9 },
+    );
+  }
+
+  async advise({ game, characters, jinxes, interactions, question, history = [] }: AiAdviceRequest): Promise<string> {
     const name = (id?: string) => (id ? (characters.get(id)?.name ?? id) : "");
     const grimoire = game.players
       .map((p) => {
@@ -164,8 +276,14 @@ ${recent}`;
       [
         {
           role: "system",
-          content: `${BASE_RULES}\nResponde en pocas líneas y de forma práctica. Si propones información falsa, que sea creíble y útil para la partida.`,
+          content: `${BASE_RULES}\nResponde en pocas líneas y de forma práctica. Si propones información falsa, que sea creíble y útil para la partida.
+El Narrador puede repreguntar sobre lo ya hablado: el estado de la partida que vale es siempre el del último mensaje.`,
         },
+        // Lo ya hablado va sin su Grimorio de entonces: solo cuenta el de ahora, que viaja con la pregunta nueva.
+        ...history.slice(-ADVICE_HISTORY_LIMIT).flatMap((turn): ChatMessage[] => [
+          { role: "user", content: `Pregunta del Narrador: ${turn.question}` },
+          { role: "assistant", content: turn.answer },
+        ]),
         { role: "user", content: `${context}\n\nPregunta del Narrador: ${question}` },
       ],
       { temperature: 0.7 },

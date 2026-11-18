@@ -86,6 +86,8 @@ export interface Game {
   log: GameLogEntry[];
   /** Explicación y consejos que dio la IA al preparar la partida. */
   aiNotes?: string;
+  /** Crónica de la partida que escribió la IA al terminar, si el Narrador la pidió. */
+  chronicle?: string;
   /** Código corto para que los jugadores se unan (fase futura). */
   joinCode: string;
   createdAt: string;

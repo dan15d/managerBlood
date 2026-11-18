@@ -1,12 +1,13 @@
 import type { ScriptSize } from "@application/use-cases/AiScriptUseCases";
 import type { Edition } from "@domain/entities/Character";
-import { FileJson, ImagePlus, Sparkles, Trash2, TriangleAlert } from "lucide-react";
+import { FileJson, ImagePlus, SearchCheck, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { errorMessage, useApp } from "../app/AppContext";
 import { CharacterPicker } from "../components/CharacterPicker";
 import { EditionBanner } from "../components/EditionBanner";
 import { shrinkImage } from "../imageFile";
+import { ScriptReviewSheet, useScriptReview } from "../components/ScriptReviewSheet";
 import { Sheet } from "../components/Sheet";
 
 const EDITIONS: { id: Edition | "all"; label: string }[] = [
@@ -37,6 +38,7 @@ export function ScriptEditorPage() {
   const [size, setSize] = useState<ScriptSize>("classic");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiNote, setAiNote] = useState<{ explanation: string; warnings: string[] } | null>(null);
+  const review = useScriptReview();
 
   const generate = async () => {
     setAiBusy(true);
@@ -120,6 +122,9 @@ export function ScriptEditorPage() {
         <div className="row">
           <button className="btn btn--small btn--primary" onClick={() => setAiOpen(true)}>
             <Sparkles /> Con IA
+          </button>
+          <button className="btn btn--small" onClick={() => review.start(name, selected)} disabled={selected.length < 5}>
+            <SearchCheck /> Revisar
           </button>
           <button className="btn btn--small" onClick={() => setImporting(true)}>
             <FileJson /> JSON
@@ -254,6 +259,16 @@ export function ScriptEditorPage() {
             </div>
           )}
         </Sheet>
+      )}
+
+      {review.open && (
+        <ScriptReviewSheet
+          state={review}
+          name={name}
+          characterIds={selected}
+          // El que entra ocupa el sitio del que sale, para no descolocar la lista.
+          onApply={(swap) => setSelected((s) => s.map((x) => (x === swap.removeId ? swap.addId : x)))}
+        />
       )}
 
       {importing && (

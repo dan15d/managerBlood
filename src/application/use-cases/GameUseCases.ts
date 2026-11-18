@@ -8,7 +8,7 @@ import { shuffle, type RandomFn } from "@domain/services/Random";
 import { applySetupEffects, seatMarionette } from "@domain/services/SetupGenerator";
 import { gameCharacterIds, jinxesAmong } from "@domain/services/SpecialRules";
 import { isDealt, validateSelection } from "@domain/services/SetupRules";
-import type { AiStoryteller } from "../ports/AiStoryteller";
+import type { AiAdviceTurn, AiStoryteller } from "../ports/AiStoryteller";
 import type { CharacterCatalog } from "../ports/CharacterCatalog";
 import type { CharacterGuideSource } from "../ports/CharacterGuides";
 import { GameNotFoundError, type GameRepository, type GameSummary } from "../ports/GameRepository";
@@ -199,13 +199,29 @@ export class AskAiAdvice {
     private readonly guides: CharacterGuideSource,
   ) {}
 
-  async execute(game: Game, question: string): Promise<string> {
+  /** `history`: lo ya hablado en esta conversación, para que se pueda repreguntar. */
+  async execute(game: Game, question: string, history: AiAdviceTurn[] = []): Promise<string> {
     if (!question.trim()) throw new Error("Escribe la pregunta.");
     const inPlay = gameCharacterIds(game);
     const jinxes = jinxesAmong(inPlay, this.catalog.jinxes());
     // Si no cargan las interacciones (sin conexión), se pregunta igual sin ellas.
     const interactions = await this.guides.interactions().then((list) => jinxesAmong(inPlay, list), () => []);
-    return this.ai.advise({ game, characters: this.catalog.map(), jinxes, interactions, question: question.trim() });
+    return this.ai.advise({ game, characters: this.catalog.map(), jinxes, interactions, question: question.trim(), history });
+  }
+}
+
+/** Crónica de una partida terminada. Solo se escribe cuando el Narrador la pide: cada una cuesta una consulta. */
+export class WriteAiChronicle {
+  constructor(
+    private readonly ai: AiStoryteller,
+    private readonly catalog: CharacterCatalog,
+  ) {}
+
+  async execute(game: Game): Promise<string> {
+    if (game.status !== "finished") throw new Error("La crónica se escribe cuando termina la partida.");
+    const text = (await this.ai.chronicle({ game, characters: this.catalog.map() })).trim();
+    if (!text) throw new Error("La IA no ha escrito nada. Prueba otra vez.");
+    return text;
   }
 }
 

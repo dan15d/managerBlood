@@ -13,7 +13,8 @@ import { InfoTokenSheet } from "../../components/InfoTokenSheet";
 import { LogList } from "../../components/LogList";
 import { Menu } from "../../components/Menu";
 import { Sheet } from "../../components/Sheet";
-import { AiPanel } from "./AiPanel";
+import { AiPanel, type AiExchange } from "./AiPanel";
+import { ChronicleSheet } from "./ChronicleSheet";
 import { DayPanel } from "./DayPanel";
 import { FabledBar } from "./FabledBar";
 import { Grimoire } from "./Grimoire";
@@ -22,7 +23,7 @@ import { NightStrip } from "./NightStrip";
 import { PhaseClock } from "./PhaseClock";
 import { PlayerSheet } from "./PlayerSheet";
 import { QuickSheet } from "./QuickSheet";
-import { ArrowLeft, ArrowLeftRight, Eye, EyeOff, Flag, Moon, ScrollText, Smartphone, Sparkles, Sun, Undo2, WandSparkles } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Eye, EyeOff, Feather, Flag, Moon, ScrollText, Smartphone, Sparkles, Sun, Undo2, WandSparkles } from "lucide-react";
 import { useWakeLock } from "../../hooks/useWakeLock";
 
 type Tab = "phase" | "ai" | "log";
@@ -67,6 +68,9 @@ export function GamePage() {
   const [addingFabled, setAddingFabled] = useState(false);
   const [composing, setComposing] = useState(false);
   const [pitHagTarget, setPitHagTarget] = useState<string | null>(null);
+  const [chronicleOpen, setChronicleOpen] = useState(false);
+  // La conversación con el consejero vive aquí para que no se pierda al cambiar de pestaña.
+  const [aiThread, setAiThread] = useState<AiExchange[]>([]);
   const characters = app.catalog.map();
   const gameRef = useRef<Game | null>(null);
   // Estados anteriores para «Deshacer» (solo en esta pantalla; al recargar se pierden).
@@ -443,9 +447,16 @@ export function GamePage() {
         </Sheet>
       )}
 
+      {chronicleOpen && (
+        <ChronicleSheet game={game} onClose={() => setChronicleOpen(false)} onSave={(text) => change((g) => ({ ...g, chronicle: text }))} />
+      )}
+
       {game.status === "finished" ? (
         <div className={`banner banner--${game.winner}`}>
           <h2 style={{ flex: 1 }}>{game.winner === "good" ? "Ha ganado el Bien" : "Ha ganado el Mal"}</h2>
+          <button className="btn btn--small btn--gold" onClick={() => setChronicleOpen(true)}>
+            <Feather /> Crónica
+          </button>
           <button className="btn btn--small" onClick={() => change(rules.reopen)}>
             Reabrir
           </button>
@@ -597,7 +608,7 @@ export function GamePage() {
                   }}
                 />
               ))}
-            {tab === "ai" && <AiPanel game={game} />}
+            {tab === "ai" && <AiPanel game={game} thread={aiThread} onThreadChange={setAiThread} />}
             {tab === "log" && <LogList log={game.log} />}
           </div>
         </section>

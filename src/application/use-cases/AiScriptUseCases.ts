@@ -1,5 +1,6 @@
 import type { Team } from "@domain/entities/Character";
-import type { AiScriptProposal, AiStoryteller } from "../ports/AiStoryteller";
+import { jinxesAmong } from "@domain/services/SpecialRules";
+import type { AiScriptProposal, AiScriptReview, AiStoryteller } from "../ports/AiStoryteller";
 import type { CharacterCatalog } from "../ports/CharacterCatalog";
 
 export type ScriptSize = "classic" | "teensy";
@@ -15,6 +16,45 @@ const BAG_TEAMS: Team[] = ["townsfolk", "outsider", "minion", "demon"];
 export interface GeneratedScript extends AiScriptProposal {
   /** Avisos si la IA no ha clavado el reparto (el Narrador lo puede retocar en el editor). */
   warnings: string[];
+}
+
+/** Con menos personajes no hay guion que valorar. */
+const MIN_TO_REVIEW = 5;
+
+export interface ScriptReview extends AiScriptReview {
+  /** Personajes del guion tal como se revisó, para saber si ha cambiado desde entonces. */
+  reviewedIds: string[];
+}
+
+/** Pide a la IA una opinión sobre un guion y se queda solo con los cambios que se pueden aplicar. */
+export class ReviewAiScript {
+  constructor(
+    private readonly catalog: CharacterCatalog,
+    private readonly ai: AiStoryteller,
+  ) {}
+
+  async execute(input: { name: string; characterIds: string[] }): Promise<ScriptReview> {
+    const ids = [...new Set(input.characterIds)].filter((id) => this.catalog.get(id));
+    if (ids.length < MIN_TO_REVIEW) throw new Error("Añade más personajes al guion antes de revisarlo.");
+    const inScript = new Set(ids);
+    const review = await this.ai.reviewScript({
+      name: input.name.trim(),
+      characters: ids.map((id) => this.catalog.get(id)!),
+      jinxes: jinxesAmong(ids, this.catalog.jinxes()),
+      alternatives: this.catalog.all().filter((c) => BAG_TEAMS.includes(c.team) && !inScript.has(c.id)),
+    });
+
+    // Cada personaje sale o entra una sola vez; lo que no exista o no cuadre con el guion se descarta.
+    const used = new Set<string>();
+    const swaps = review.swaps.filter((s) => {
+      const add = this.catalog.get(s.addId);
+      const ok = inScript.has(s.removeId) && !!add && BAG_TEAMS.includes(add.team) && !inScript.has(s.addId) && !used.has(s.removeId) && !used.has(s.addId);
+      if (ok) used.add(s.removeId).add(s.addId);
+      return ok;
+    });
+    if (!review.verdict.trim() && !review.problems.length && !swaps.length) throw new Error("La IA no ha sabido valorar el guion. Prueba otra vez.");
+    return { ...review, swaps, reviewedIds: ids };
+  }
 }
 
 /** Diseña un guion con IA a partir de una idea y comprueba que los personajes existen y cuadran por tipo. */

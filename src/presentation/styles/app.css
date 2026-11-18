@@ -2823,6 +2823,63 @@ button.token {
   padding: 4px 0;
 }
 
+/* Revisión de un guion con IA. */
+.review-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 0.95rem;
+}
+
+.review-list li {
+  padding: 3px 0;
+}
+
+.review-swaps {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.review-swap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.review-swap__pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+}
+
+.review-swap__pair > .lucide {
+  color: var(--muted);
+  width: 18px;
+  height: 18px;
+}
+
+/* Crónica de la partida. */
+.chronicle {
+  white-space: pre-line;
+  margin: 0;
+}
+
+.chronicle__title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--gold-bright);
+}
+
 /* ---------- Pantallas más grandes (mobile first: esto amplía) ---------- */
 
 @media (min-width: 640px) {

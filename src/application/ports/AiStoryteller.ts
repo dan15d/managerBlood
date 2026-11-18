@@ -35,6 +35,42 @@ export interface AiAdviceRequest {
   /** Interacciones de la wiki entre los personajes en juego. */
   interactions: Interaction[];
   question: string;
+  /** Lo ya hablado en esta conversación, de más antiguo a más reciente, para poder repreguntar. */
+  history?: AiAdviceTurn[];
+}
+
+export interface AiAdviceTurn {
+  question: string;
+  answer: string;
+}
+
+export interface AiScriptReviewRequest {
+  name: string;
+  /** Personajes del guion que se revisa. */
+  characters: Character[];
+  /** Incompatibilidades entre los personajes del guion. */
+  jinxes: Jinx[];
+  /** Personajes que no están en el guion, entre los que proponer cambios. */
+  alternatives: Character[];
+}
+
+/** Cambio concreto: quitar un personaje del guion y poner otro en su lugar. */
+export interface AiScriptSwap {
+  removeId: string;
+  addId: string;
+  reason: string;
+}
+
+export interface AiScriptReview {
+  verdict: string;
+  strengths: string[];
+  problems: string[];
+  swaps: AiScriptSwap[];
+}
+
+export interface AiChronicleRequest {
+  game: Game;
+  characters: Map<string, Character>;
 }
 
 export interface AiScriptRequest {
@@ -61,4 +97,8 @@ export interface AiStoryteller {
   proposeSetup(request: AiSetupRequest): Promise<AiSetupProposal>;
   advise(request: AiAdviceRequest): Promise<string>;
   proposeScript(request: AiScriptRequest): Promise<AiScriptProposal>;
+  /** Opina sobre un guion ya hecho: qué funciona, qué cojea y qué cambiar. */
+  reviewScript(request: AiScriptReviewRequest): Promise<AiScriptReview>;
+  /** Relato de una partida terminada, para leer o compartir con la mesa. */
+  chronicle(request: AiChronicleRequest): Promise<string>;
 }
